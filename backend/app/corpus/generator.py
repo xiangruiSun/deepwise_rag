@@ -317,8 +317,9 @@ def build_queries(n_golden: int, n_tenants: int = 8, seed: int = 13) -> list[dic
         elif pos == 4:  # readable only by the "restricted" group
             add("authorized_restricted", g, f"{condition} {marker_text} {department}", me,
                 groups=[PUBLIC_GROUP, "restricted"])
+            # the caller may still be answered from OTHER documents; only this one must stay hidden
             add("unauthorized_group", g, f"{condition} {marker_text} {department}", {},
-                forbidden_documents=[doc_id(g)], expects_abstention=True)
+                forbidden_documents=[doc_id(g)])
         elif pos in (5, 6):  # the current version says "resolved"
             add("temporal_update", g, f"What is the current follow-up status of the {condition} "
                 f"{marker_text} for patient {patient}?", me, required_facts=["resolved"])

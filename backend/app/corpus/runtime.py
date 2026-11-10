@@ -9,8 +9,10 @@ import yaml
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
+from app.corpus.batch import BatchJobManager
 from app.corpus.cache import CorpusCache, build_cache_backend
 from app.corpus.config import CorpusConfig, load_corpus_config
+from app.corpus.evaluation import ExperimentTracker
 from app.corpus.generation import build_llm
 from app.corpus.indexing import IndexManager
 from app.corpus.retrieval import HybridRetriever
@@ -30,6 +32,9 @@ class CorpusRuntime:
     retriever: HybridRetriever
     cache: CorpusCache
     service: CorpusService
+    batch: BatchJobManager
+    tracker: ExperimentTracker
+    eval_dataset_dir: Path
 
 
 def load_acronyms(config: CorpusConfig, config_dir: Path) -> dict[str, str]:
@@ -59,7 +64,11 @@ def build_corpus_runtime(settings: Settings, session_factory: sessionmaker[Sessi
 
     indexes.on_change = invalidate
     service = CorpusService(config, indexes, retriever, cache, build_llm(config.generation))
-    return CorpusRuntime(config, session_factory, backend, embeddings, indexes, retriever, cache, service)
+    work = settings.artifact_dir / "corpus"
+    batch = BatchJobManager(service, session_factory, work / "batch")
+    tracker = ExperimentTracker(service, work / "evaluations")
+    return CorpusRuntime(config, session_factory, backend, embeddings, indexes, retriever, cache, service,
+                         batch, tracker, work / "eval_datasets")
 
 
 def standalone_runtime(settings: Settings, config_name: str | None = None) -> CorpusRuntime:

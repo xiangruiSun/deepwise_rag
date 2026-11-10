@@ -103,7 +103,7 @@ class RedisCache:
         self._client = redis.Redis.from_url(url, socket_timeout=1.0, socket_connect_timeout=1.0)
 
     def get(self, key: str) -> bytes | None:
-        value = self._client.get(self.prefix + key)
+        value: Any = self._client.get(self.prefix + key)
         return bytes(value) if value is not None else None
 
     def set(self, key: str, value: bytes, ttl_seconds: int) -> None:

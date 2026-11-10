@@ -135,14 +135,15 @@ class CorpusService:
         return bundle
 
     # ------------------------------------------------------------------ events
-    async def events(self, auth: AuthContext, request: QueryRequest) -> AsyncIterator[dict[str, Any]]:
+    async def events(self, auth: AuthContext, request: QueryRequest,
+                     use_cache: bool = True) -> AsyncIterator[dict[str, Any]]:
         """Typed events of one RAG request: ``retrieval``, ``token``*, ``citations``, ``done``."""
         started = time.perf_counter()
         timer = StageTimer()
         trace_id = new_trace_id()
         max_sentences, max_tokens = RESPONSE_LENGTHS[request.response_length]
         warnings: list[str] = []
-        result = await asyncio.to_thread(self.retrieve, auth, request, timer)
+        result = await asyncio.to_thread(self.retrieve, auth, request, timer, use_cache)
         bundle = await asyncio.to_thread(self.build_context, auth, result, timer)
         warnings.extend(result.warnings)
         yield {"event": "retrieval", "data": {
@@ -260,6 +261,9 @@ class CorpusService:
             "usage": {"prompt_tokens": generation.prompt_tokens, "completion_tokens": generation.completion_tokens,
                       "context_tokens": bundle.tokens_used},
             "context": bundle.stats(), "retrieved_chunks": [c.chunk.chunk_id for c in bundle.items],
+            "context_documents": [c.chunk.document_id for c in bundle.items],
+            "ranked_documents": list(dict.fromkeys(c.document_id for c in result.chunks)),
+            "candidates": result.candidates,
             "removed_sentences": generation.removed_sentences,
             "invalid_citations": sorted(set(generation.invalid_citations)),
             "mock": generation.mock, "degraded": degraded, "cache_hit": result.cache_hit,
@@ -267,10 +271,11 @@ class CorpusService:
             "query_hash": sha256_text(request.query)[:32],
         }}
 
-    async def answer(self, auth: AuthContext, request: QueryRequest, timeout: float | None = None) -> dict[str, Any]:
+    async def answer(self, auth: AuthContext, request: QueryRequest, timeout: float | None = None,
+                     use_cache: bool = True) -> dict[str, Any]:
         async def run() -> dict[str, Any]:
             final: dict[str, Any] = {}
-            async for event in self.events(auth, request):
+            async for event in self.events(auth, request, use_cache):
                 if event["event"] == "done":
                     final = event["data"]
             return final
@@ -281,9 +286,10 @@ class CorpusService:
             QUERIES.labels(outcome="timeout").inc()
             raise RequestTimeout("the request exceeded the configured time limit") from exc
 
-    def answer_sync(self, auth: AuthContext, request: QueryRequest, timeout: float | None = None) -> dict[str, Any]:
+    def answer_sync(self, auth: AuthContext, request: QueryRequest, timeout: float | None = None,
+                    use_cache: bool = True) -> dict[str, Any]:
         """For batch workers and scripts that are not inside an event loop."""
-        return asyncio.run(self.answer(auth, request, timeout))
+        return asyncio.run(self.answer(auth, request, timeout, use_cache))
 
     # ------------------------------------------------------------------ health
     async def readiness(self) -> dict[str, Any]:

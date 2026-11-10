@@ -147,3 +147,102 @@ def query(
         _echo({"plan": result.plan.as_dict(), "results": [c.public() for c in result.chunks[:8]]})
     else:
         _echo(runtime.service.answer_sync(auth, request))
+
+
+@corpus_app.command("capacity")
+def capacity(
+    records: Annotated[int, typer.Option(help="Source records to plan for.")] = 100_000_000,
+    dimension: int = 1024,
+    chunks_per_document: float = 1.3,
+    avg_document_bytes: float = 1200.0,
+    avg_chunk_bytes: float = 900.0,
+    vector_encoding: Annotated[str, typer.Option(help="float32 | float16 | int8")] = "float32",
+    quantized_index: bool = False,
+    replicas: int = 1,
+    shard_target_gb: float = 40.0,
+    embedding_rate: Annotated[Optional[float], typer.Option(help="Measured chunks/second per GPU.")] = None,
+    gpus: int = 1,
+    calibrate_from_active: Annotated[bool, typer.Option("--calibrate", help="Use bytes/chunk of the active index.")] = False,
+    corpus_config: CorpusConfigOpt = None,
+) -> None:
+    """Estimate storage and memory for a target scale (a model; calibrate before trusting it)."""
+    from app.corpus.capacity import CapacityInputs, calibrate, estimate
+
+    inputs = CapacityInputs(source_records=records, dimension=dimension, chunks_per_document=chunks_per_document,
+                            avg_document_bytes=avg_document_bytes, avg_chunk_bytes=avg_chunk_bytes,
+                            vector_encoding=vector_encoding, quantized_index=quantized_index,  # type: ignore[arg-type]
+                            replicas=replicas, shard_target_gb=shard_target_gb,
+                            embedding_chunks_per_second_per_gpu=embedding_rate, gpus=gpus)
+    measured = None
+    if calibrate_from_active:
+        runtime = _runtime(corpus_config)
+        measured = calibrate(runtime.backend.stats(runtime.indexes.require_active()))
+    _echo(estimate(inputs, measured))
+
+
+batch_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Offline batch RAG jobs.")
+eval_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Evaluation runs.")
+corpus_app.add_typer(batch_app, name="batch")
+corpus_app.add_typer(eval_app, name="eval")
+
+
+@batch_app.command("submit")
+def batch_submit(
+    input_file: Annotated[Path, typer.Argument(help="JSONL or Parquet file with a 'query' column.")],
+    tenant: str = "tenant-000",
+    groups: str = "public",
+    strategy: Optional[str] = None,
+    run: Annotated[bool, typer.Option(help="Run the job now instead of leaving it queued.")] = False,
+    corpus_config: CorpusConfigOpt = None,
+) -> None:
+    """Queue a batch job from a file (copied into the batch input directory)."""
+    import shutil
+
+    from app.corpus.retrieval import AuthContext
+
+    runtime = _runtime(corpus_config)
+    runtime.batch.input_dir.mkdir(parents=True, exist_ok=True)
+    target = runtime.batch.input_dir / input_file.name
+    if input_file.resolve() != target.resolve():
+        shutil.copyfile(input_file, target)
+    auth = AuthContext(tenant, "cli", frozenset(g.strip() for g in groups.split(",") if g.strip()) | {"public"})
+    job = runtime.batch.create(auth, input_uri=input_file.name, strategy=strategy)
+    _echo(runtime.batch.run(job["job_id"]) if run else job)
+
+
+@batch_app.command("work")
+def batch_work(max_jobs: Optional[int] = None, requeue_stale_after: float = 900.0,
+               corpus_config: CorpusConfigOpt = None) -> None:
+    """Batch worker: resume jobs of dead workers, then run queued jobs until the queue is empty."""
+    runtime = _runtime(corpus_config)
+    _echo({"requeued": runtime.batch.requeue_stale(requeue_stale_after), "finished": runtime.batch.work(max_jobs)})
+
+
+@batch_app.command("status")
+def batch_status(job_id: str, corpus_config: CorpusConfigOpt = None) -> None:
+    _echo(_runtime(corpus_config).batch.get(job_id))
+
+
+@eval_app.command("run")
+def eval_run(
+    dataset: Annotated[Path, typer.Option(help="Evaluation dataset (JSONL).")] = DEFAULT_DATA / "eval" / "queries.jsonl",
+    strategy: Annotated[Optional[list[str]], typer.Option(help="Strategy name; repeat to compare several.")] = None,
+    baseline: Optional[str] = None,
+    limit: Optional[int] = None,
+    output: Annotated[Optional[Path], typer.Option(help="Directory for run artifacts.")] = None,
+    notes: str = "",
+    corpus_config: CorpusConfigOpt = None,
+) -> None:
+    """Compare retrieval strategies on a frozen dataset; writes run.json, report.md and per-query files."""
+    from app.corpus.evaluation import EvalDataset, ExperimentTracker
+
+    runtime = _runtime(corpus_config)
+    tracker = ExperimentTracker(runtime.service, output) if output else runtime.tracker
+    names = strategy or ["bm25", "dense", "hybrid", "hybrid_rerank", "hybrid_rerank_routed", "adaptive"]
+    run = tracker.run(EvalDataset.load(dataset), names, baseline, limit=limit, notes=notes)
+    _echo({"run_id": run["run_id"], "artifact_dir": run["artifact_dir"], "gates_passed": run["gates_passed"],
+           "seconds": run["seconds"],
+           "ndcg@10": {s["strategy"]: s["aggregate"].get("ndcg@10") for s in run["strategies"]},
+           "verdicts": {c["candidate"]: c["metrics"]["ndcg@10"]["verdict"] for c in run["comparisons"]}})
+    if not run["gates_passed"]:
+        raise typer.Exit(code=3)

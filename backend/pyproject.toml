@@ -33,7 +33,12 @@ haystack = ["haystack-ai>=2.6"]
 tracking = ["mlflow-skinny>=2.14"]
 observability = ["opentelemetry-api>=1.25", "opentelemetry-sdk>=1.25",
                  "opentelemetry-exporter-otlp-proto-http>=1.25", "opentelemetry-instrumentation-fastapi>=0.46b0"]
-dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10", "types-PyYAML"]
+# document-corpus platform: distributed ETL, Redis cache, Kafka transport, load tests
+spark = ["pyspark>=4.0,<4.2"]
+cache = ["redis>=5"]
+streaming = ["confluent-kafka>=2.4"]
+load = ["locust>=2.29"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10", "types-PyYAML", "fakeredis>=2.23"]
 
 [project.scripts]
 inspect-rag = "app.cli:app"

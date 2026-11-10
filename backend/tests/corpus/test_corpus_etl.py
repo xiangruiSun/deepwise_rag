@@ -202,3 +202,27 @@ def test_jsonl_csv_text_and_sql_sources_stream_through_the_same_normaliser(tmp_p
     report = normalize_source(spec, tmp_path / "ns", factory)
     assert report.counts["rows_valid"] == 25
     assert load_normalized(tmp_path / "ns", factory).counts["inserted"] == 25
+
+
+def test_capacity_estimate_matches_hand_computation_and_calibration() -> None:
+    from app.corpus.capacity import CapacityInputs, calibrate, estimate
+
+    plan = estimate(CapacityInputs(source_records=100_000_000, chunks_per_document=1.0, dimension=1024,
+                                   vector_encoding="float16", replicas=1, hnsw_m=16))
+    assert plan["chunks"] == 100_000_000
+    assert plan["components_gb"]["vectors_raw"] == 204.8                 # 100M * 1024 * 2 bytes
+    assert plan["components_gb"]["ann_graph"] == 13.6                    # 100M * 32 * 4 * (1 + 1/16)
+    assert plan["index_with_replicas_gb"] == pytest.approx(2 * plan["index_primary_gb"], abs=0.02)
+    assert plan["index_peak_gb"] == pytest.approx(4 * plan["index_primary_gb"], abs=0.05)   # serving + rebuild
+    assert plan["suggested_primary_shards"] == -(-plan["index_primary_gb"] // 40)
+    quantized = estimate(CapacityInputs(source_records=1_000_000, chunks_per_document=1.0, dimension=768,
+                                        quantized_index=True, embedding_chunks_per_second_per_gpu=500, gpus=2))
+    assert quantized["components_gb"]["vectors_quantized_copy"] == 0.77  # 1M * 768 * 1 byte
+    assert quantized["search_memory_gb"]["vectors_and_graph_page_cache_per_copy"] < quantized["components_gb"]["vectors_raw"]
+    assert quantized["embedding_hours"] == pytest.approx(1_000_000 / 1000 / 3600, abs=0.05)
+    measured = calibrate({"documents": 20_400, "size_bytes": 390_300_000})
+    assert measured == pytest.approx(19_132, rel=0.01)
+    calibrated = estimate(CapacityInputs(source_records=10_000_000, chunks_per_document=1.0), measured)
+    assert calibrated["index_primary_source"] == "measured bytes per chunk"
+    assert calibrated["index_primary_gb"] == pytest.approx(191.3, rel=0.01)
+    assert calibrate({"documents": 0, "size_bytes": 0}) is None
