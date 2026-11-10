@@ -212,10 +212,20 @@ def batch_submit(
 
 @batch_app.command("work")
 def batch_work(max_jobs: Optional[int] = None, requeue_stale_after: float = 900.0,
-               corpus_config: CorpusConfigOpt = None) -> None:
+               loop: Annotated[bool, typer.Option(help="Keep polling for new jobs (worker process).")] = False,
+               poll_seconds: float = 5.0, corpus_config: CorpusConfigOpt = None) -> None:
     """Batch worker: resume jobs of dead workers, then run queued jobs until the queue is empty."""
+    import time
+
     runtime = _runtime(corpus_config)
-    _echo({"requeued": runtime.batch.requeue_stale(requeue_stale_after), "finished": runtime.batch.work(max_jobs)})
+    while True:
+        result = {"requeued": runtime.batch.requeue_stale(requeue_stale_after),
+                  "finished": runtime.batch.work(max_jobs)}
+        if result["requeued"] or result["finished"] or not loop:
+            _echo(result)
+        if not loop:
+            return
+        time.sleep(poll_seconds)
 
 
 @batch_app.command("status")
@@ -246,3 +256,72 @@ def eval_run(
            "verdicts": {c["candidate"]: c["metrics"]["ndcg@10"]["verdict"] for c in run["comparisons"]}})
     if not run["gates_passed"]:
         raise typer.Exit(code=3)
+
+
+events_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Change events (outbox / CDC).")
+schedule_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Scheduled maintenance tasks.")
+corpus_app.add_typer(events_app, name="events")
+corpus_app.add_typer(schedule_app, name="schedule")
+
+
+@events_app.command("process")
+def events_process(
+    loop: Annotated[bool, typer.Option(help="Keep polling instead of processing one batch.")] = False,
+    kafka: Annotated[Optional[str], typer.Option(help="Kafka bootstrap servers; default reads the outbox table.")] = None,
+    topic: str = "corpus.document-changes",
+    corpus_config: CorpusConfigOpt = None,
+) -> None:
+    """Apply pending change events to the registry and the active index."""
+    from app.corpus.events import EventProcessor, EventSource, KafkaEventSource, OutboxEventSource
+
+    runtime = _runtime(corpus_config)
+    source: EventSource = KafkaEventSource(kafka, topic) if kafka else OutboxEventSource(runtime.session_factory)
+    processor = EventProcessor(source, runtime.session_factory, runtime.indexes)
+    _echo(processor.run() if loop else processor.process_batch())
+
+
+@schedule_app.command("run-task")
+def schedule_run_task(name: Annotated[str, typer.Argument(help="incremental_index | data_quality | consistency | drift")],
+                      corpus_config: CorpusConfigOpt = None) -> None:
+    """Run one maintenance task once (what a CronJob calls)."""
+    from app.corpus.scheduler import TASKS
+
+    if name not in TASKS:
+        raise typer.BadParameter(f"unknown task; choose one of {sorted(TASKS)}")
+    result = TASKS[name](_runtime(corpus_config))
+    _echo(result)
+    if result.get("ok") is False:
+        raise typer.Exit(code=3)
+
+
+@schedule_app.command("run")
+def schedule_run(tick_seconds: float = 5.0, corpus_config: CorpusConfigOpt = None) -> None:
+    """Run the local scheduler (incremental indexing, drift, data quality, consistency)."""
+    from app.corpus.scheduler import CorpusScheduler
+
+    CorpusScheduler(_runtime(corpus_config)).run_forever(tick_seconds)
+
+
+@corpus_app.command("cost")
+def cost(
+    prompt_tokens: Annotated[float, typer.Option(help="Prompt tokens per query (from an evaluation run).")],
+    completion_tokens: Annotated[float, typer.Option(help="Completion tokens per query.")],
+    rerank_pairs: float = 0,
+    queries_per_month: float = 1_000_000,
+    gpu_hour_usd: float = 2.0,
+    fixed_monthly_usd: float = 0,
+) -> None:
+    """Cost per query from measured token counts and ASSUMED unit prices."""
+    from app.corpus.analysis import CostInputs, estimate_query_cost
+
+    _echo(estimate_query_cost(CostInputs(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+                                         rerank_pairs=rerank_pairs, queries_per_month=queries_per_month,
+                                         gpu_hour_usd=gpu_hour_usd, fixed_monthly_usd=fixed_monthly_usd)))
+
+
+@corpus_app.command("feedback-report")
+def feedback_report(days: int = 30, min_reports: int = 2, corpus_config: CorpusConfigOpt = None) -> None:
+    """Failure clusters and candidate regression tests from user feedback."""
+    from app.corpus.analysis import feedback_failure_analysis
+
+    _echo(feedback_failure_analysis(_runtime(corpus_config).session_factory, days, min_reports))

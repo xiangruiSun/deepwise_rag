@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: corpus-api
+  namespace: inspect-rag
+  labels: {app: corpus-api}
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app: corpus-api}
+  template:
+    metadata:
+      labels: {app: corpus-api}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /api/v1/metrics
+        prometheus.io/port: "8000"
+    spec:
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: corpus-api}}
+      containers:
+        - name: api
+          image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+          # migrations run as a separate Job before rollout, not in every replica
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports: [{containerPort: 8000, name: http}]
+          envFrom: [{configMapRef: {name: inspect-rag-config}}]
+          env:
+            - name: INSPECT_RAG_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+            - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+            - name: INSPECT_RAG_API_KEYS_JSON
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: api-keys-json}}
+            - name: INSPECT_RAG_LLM_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: llm-api-key}}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:            # fails while there is no active index or the search cluster is unreachable
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: {exec: {command: ["sleep", "10"]}}   # let the load balancer drain before SIGTERM
+          resources:
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {memory: 4Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: artifacts, mountPath: /srv/artifacts}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: artifacts, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: corpus-api
+  namespace: inspect-rag
+spec:
+  selector: {app: corpus-api}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: corpus-api
+  namespace: inspect-rag
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: corpus-api}
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 60}}
+  behavior:
+    scaleDown: {stabilizationWindowSeconds: 300}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: corpus-api
+  namespace: inspect-rag
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: {app: corpus-api}

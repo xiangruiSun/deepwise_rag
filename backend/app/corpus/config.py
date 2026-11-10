@@ -51,6 +51,8 @@ class RetrievalParams(StrictModel):
     max_rewrites: int = Field(default=2, ge=0, le=5)
     adaptive_depth: bool = False
     freshness: bool = True
+    # per-strategy override of context.selection, so context packing can be ablated like retrieval
+    context_selection: Literal["top_k", "diverse"] | None = None
 
 
 class ContextParams(StrictModel):
@@ -64,6 +66,10 @@ class ContextParams(StrictModel):
     # drop candidates scoring below this fraction of the best candidate's score
     min_relative_score: float = Field(default=0.0, ge=0.0, le=1.0)
     parent_expansion: bool = False
+    # withhold sentences of retrieved text that address the model ("ignore previous instructions ...")
+    quarantine_instructions: bool = True
+    # flag pairs of context sentences from different documents that contradict each other
+    detect_conflicts: bool = True
 
 
 class GenerationParams(StrictModel):

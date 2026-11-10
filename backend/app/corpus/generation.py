@@ -30,7 +30,7 @@ import httpx
 
 from app.core.errors import AppError, DependencyUnavailable
 from app.corpus.config import GenerationParams
-from app.corpus.context import ContextBundle
+from app.corpus.context import WITHHELD, ContextBundle
 from app.corpus.telemetry import LLM_IN_FLIGHT, LLM_QUEUE, LLM_REQUESTS
 from app.rag.citations import assess_claim_support
 from app.rag.evidence import EvidenceItem, estimate_tokens
@@ -172,7 +172,8 @@ class ExtractiveAnswerer:
         # an identifier lookup is answered by the identified record itself
         for item in bundle.items:
             if identifiers and item.chunk.source_record_id in identifiers:
-                lead = [x.strip() for x in _SENTENCE_END.split(item.text) if x.strip()][:max_sentences]
+                lead = [x.strip() for x in _SENTENCE_END.split(item.text)
+                        if x.strip() and WITHHELD not in x][:max_sentences]
                 picked = [{"text": text, "citations": [item.source_id], "supported": True} for text in lead]
                 rendered = " ".join(f"{x['text']} [{item.source_id}]" for x in picked)
                 return GenerationResult(rendered, picked, False, None, prompt_tokens, estimate_tokens(rendered))
@@ -184,7 +185,7 @@ class ExtractiveAnswerer:
             for sentence in _SENTENCE_END.split(item.text):
                 sentence = sentence.strip()
                 terms = {w for w in _WORD.findall(sentence.lower()) if w not in _STOP}
-                if len(terms) >= 3:
+                if len(terms) >= 3 and WITHHELD not in sentence:
                     candidates.append((sentence, item.source_id, terms))
                 seen_here |= terms
             for term in seen_here & query_terms:
@@ -288,7 +289,11 @@ class OpenAICompatibleLLM:
 
     async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         """Yield text deltas.  Raises ``Overloaded`` when the wait queue is full."""
-        self.breaker.before()
+        try:
+            self.breaker.before()
+        except CircuitOpen:
+            LLM_REQUESTS.labels(outcome="circuit_open").inc()
+            raise
         if self._slots.locked() and self._waiting >= self.params.queue_limit:
             LLM_REQUESTS.labels(outcome="rejected_overload").inc()
             raise Overloaded("the language model is at capacity; retry shortly",

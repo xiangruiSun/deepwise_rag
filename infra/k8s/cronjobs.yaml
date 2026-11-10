@@ -1,0 +1,152 @@
+# Scheduled maintenance.  Each job runs one task function of app/corpus/scheduler.py (or the
+# evaluation CLI) and exits non-zero when it reports a problem, so a failed run is visible to
+# the cluster's alerting.  Schedules are examples.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: corpus-incremental-index
+  namespace: inspect-rag
+spec:
+  schedule: "*/5 * * * *"   # safety net behind the continuous indexer
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 1000}
+          containers:
+            - name: task
+              image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+              command: ["python", "-m", "app.cli", "corpus", "schedule", "run-task", "incremental_index"]
+              envFrom: [{configMapRef: {name: inspect-rag-config}}]
+              env:
+                - name: INSPECT_RAG_DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+                - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+              resources:
+                requests: {cpu: "1", memory: 2Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: corpus-drift-check
+  namespace: inspect-rag
+spec:
+  schedule: "0 * * * *"   # hourly: does the active index match the configured models?
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 1000}
+          containers:
+            - name: task
+              image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+              command: ["python", "-m", "app.cli", "corpus", "schedule", "run-task", "drift"]
+              envFrom: [{configMapRef: {name: inspect-rag-config}}]
+              env:
+                - name: INSPECT_RAG_DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+                - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+              resources:
+                requests: {cpu: "1", memory: 2Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: corpus-data-quality
+  namespace: inspect-rag
+spec:
+  schedule: "30 2 * * *"   # nightly: registry totals and dead letters
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 1000}
+          containers:
+            - name: task
+              image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+              command: ["python", "-m", "app.cli", "corpus", "schedule", "run-task", "data_quality"]
+              envFrom: [{configMapRef: {name: inspect-rag-config}}]
+              env:
+                - name: INSPECT_RAG_DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+                - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+              resources:
+                requests: {cpu: "1", memory: 2Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: corpus-consistency
+  namespace: inspect-rag
+spec:
+  schedule: "0 3 * * 0"   # weekly: full registry/index comparison with repair
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 1000}
+          containers:
+            - name: task
+              image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+              command: ["python", "-m", "app.cli", "corpus", "schedule", "run-task", "consistency"]
+              envFrom: [{configMapRef: {name: inspect-rag-config}}]
+              env:
+                - name: INSPECT_RAG_DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+                - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+              resources:
+                requests: {cpu: "1", memory: 2Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: corpus-scheduled-evaluation
+  namespace: inspect-rag
+spec:
+  schedule: "0 4 * * *"   # nightly evaluation; exits 3 when a release gate fails
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 1000}
+          containers:
+            - name: task
+              image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+              command: ["python", "-m", "app.cli", "corpus", "eval", "run", "--dataset", "/srv/eval/queries.jsonl", "--baseline", "hybrid", "--strategy", "hybrid", "--strategy", "hybrid_rerank"]
+              envFrom: [{configMapRef: {name: inspect-rag-config}}]
+              env:
+                - name: INSPECT_RAG_DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+                - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+                  valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+              resources:
+                requests: {cpu: "1", memory: 2Gi}

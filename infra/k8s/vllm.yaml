@@ -1,0 +1,56 @@
+# GPU model server: vLLM exposing the OpenAI-compatible API that generation.backend=openai_compatible
+# talks to.  NOT run from this repository (no GPU was available); model, GPU type and flags are examples.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: inspect-rag
+  labels: {app: vllm}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: vllm}
+  template:
+    metadata:
+      labels: {app: vllm}
+    spec:
+      nodeSelector: {nvidia.com/gpu.present: "true"}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:REPLACE_WITH_PINNED_TAG
+          args: ["--model", "REPLACE_WITH_MODEL_ID", "--served-model-name", "corpus-llm",
+                 "--max-model-len", "8192", "--gpu-memory-utilization", "0.90"]
+          ports: [{containerPort: 8000, name: http}]
+          env:
+            - name: VLLM_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: llm-api-key}}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:               # model load can take minutes
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 90
+          resources:
+            limits: {nvidia.com/gpu: 1}
+            requests: {cpu: "4", memory: 32Gi}
+          volumeMounts:
+            - {name: model-cache, mountPath: /root/.cache/huggingface}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim: {claimName: vllm-model-cache}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 8Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: inspect-rag
+spec:
+  selector: {app: vllm}
+  ports: [{name: http, port: 8000, targetPort: http}]

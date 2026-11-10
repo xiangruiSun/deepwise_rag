@@ -42,6 +42,8 @@ INDEX_LAG = Gauge("corpus_index_freshness_lag_seconds", "Age of the oldest unpro
                   registry=REGISTRY)
 EVENTS = Counter("corpus_events_total", "Change events by outcome", ["outcome"], registry=REGISTRY)
 BATCH_ITEMS = Counter("corpus_batch_items_total", "Batch job items by outcome", ["outcome"], registry=REGISTRY)
+INJECTION_QUARANTINED = Counter("corpus_injection_quarantined_total",
+                                "Instruction-like sentences withheld from the generator", registry=REGISTRY)
 ACCESS_FILTERED = Counter("corpus_access_denied_total", "Requests for documents outside the caller's scope",
                           ["reason"], registry=REGISTRY)
 

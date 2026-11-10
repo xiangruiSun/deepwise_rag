@@ -1,0 +1,887 @@
+{
+  "meta": {
+    "config": "corpus.yaml",
+    "records": 20000,
+    "golden_documents": 400,
+    "tenants": 8,
+    "seed": 13,
+    "eval_dataset": "evalset-3815819a02958942",
+    "queries": 800,
+    "categories": {
+      "abbreviation": 120,
+      "authorized_restricted": 40,
+      "cross_tenant": 40,
+      "exact_identifier": 40,
+      "freshness_superseded": 40,
+      "historical": 40,
+      "keyword": 120,
+      "multi_document": 40,
+      "no_answer": 40,
+      "paraphrase": 120,
+      "prompt_injection": 40,
+      "temporal_update": 80,
+      "unauthorized_group": 40
+    },
+    "provenance": {
+      "synthetic": 800
+    },
+    "search_backend": "local",
+    "hardware": {
+      "machine": "arm64",
+      "platform": "macOS-15.5-arm64-arm-64bit"
+    },
+    "note": "Synthetic corpus and labels; measured on one workstation with the in-process search backend."
+  },
+  "index_build": {
+    "index": "corpus_chunks_v0001_cb0cfc",
+    "load_seconds": 1.17,
+    "documents": 19387,
+    "chunks": 19760,
+    "seconds": 8.469,
+    "embedding_seconds": 6.472755331022199,
+    "indexing_seconds": 0.047212086676154286,
+    "documents_per_second": 2289.2
+  },
+  "embedding": {
+    "key": "hashing",
+    "provider": "hashing",
+    "model_id": "hashing-ngram-v1",
+    "query_model_id": null,
+    "revision": {
+      "document": "hashing-v1",
+      "query": "hashing-v1"
+    },
+    "device": "cpu",
+    "batch_size": 32,
+    "max_document_tokens": 512,
+    "max_query_tokens": 512,
+    "pooling": "hashing",
+    "normalize": true,
+    "similarity": "cosine",
+    "dimension": 384,
+    "query_prefix": "",
+    "document_prefix": "",
+    "preprocessing_version": "text-v1"
+  },
+  "retrieval_ablation": {
+    "gates_passed": true,
+    "seconds": 196.53,
+    "strategies": {
+      "bm25": {
+        "ndcg@10": 0.7462140006816029,
+        "recall@10": 0.8455882352941176,
+        "fact_coverage": 0.75,
+        "freshness_error": 0.0,
+        "p50_ms": 25.525,
+        "p95_ms": 53.901
+      },
+      "dense": {
+        "ndcg@10": 0.5561112048590169,
+        "recall@10": 0.7110294117647059,
+        "fact_coverage": 0.575,
+        "freshness_error": 0.0,
+        "p50_ms": 16.01,
+        "p95_ms": 18.76
+      },
+      "hybrid": {
+        "ndcg@10": 0.636534329528649,
+        "recall@10": 0.7926470588235294,
+        "fact_coverage": 0.75,
+        "freshness_error": 0.0,
+        "p50_ms": 34.55,
+        "p95_ms": 62.278
+      },
+      "hybrid_rerank": {
+        "ndcg@10": 0.5287981995349457,
+        "recall@10": 0.7360294117647059,
+        "fact_coverage": 0.68125,
+        "freshness_error": 0.0,
+        "p50_ms": 34.935,
+        "p95_ms": 62.533
+      },
+      "hybrid_rerank_routed": {
+        "ndcg@10": 0.6716828993579238,
+        "recall@10": 0.8044117647058824,
+        "fact_coverage": 0.75,
+        "freshness_error": 0.0,
+        "p50_ms": 35.25,
+        "p95_ms": 54.441
+      },
+      "adaptive": {
+        "ndcg@10": 0.6716828993579238,
+        "recall@10": 0.8044117647058824,
+        "fact_coverage": 0.75,
+        "freshness_error": 0.0,
+        "p50_ms": 35.535,
+        "p95_ms": 55.223
+      },
+      "no_freshness": {
+        "ndcg@10": 0.6298235728120413,
+        "recall@10": 0.7941176470588235,
+        "fact_coverage": 0.75,
+        "freshness_error": 0.85,
+        "p50_ms": 34.415,
+        "p95_ms": 63.262
+      }
+    },
+    "verdicts_vs_bm25": {
+      "dense": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      },
+      "hybrid": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      },
+      "hybrid_rerank": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      },
+      "hybrid_rerank_routed": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      },
+      "adaptive": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      },
+      "no_freshness": {
+        "ndcg@10": "regressed",
+        "recall@10": "regressed"
+      }
+    }
+  },
+  "context_selection": {
+    "baseline_top_k": {
+      "metrics": {
+        "ndcg@10": 0.636534329528649,
+        "recall@10": 0.7926470588235294,
+        "mrr@10": 0.5926628151260505,
+        "context_precision": 0.10091911764705883,
+        "context_recall": 0.7786764705882353,
+        "citation_coverage": 0.5110294117647058,
+        "fact_coverage": 0.74375,
+        "abstention_correct": 0.61125,
+        "hallucination": 0.0,
+        "freshness_error": 0.0,
+        "leakage": 0.0,
+        "duplicate_context_rate": 0.00265625,
+        "context_tokens": 447.915
+      },
+      "latency_ms": {
+        "end_to_end": {
+          "p50": 29.285,
+          "p95": 58.177,
+          "p99": 64.198,
+          "mean": 33.358,
+          "n": 800
+        },
+        "retrieval": {
+          "p50": 28.006,
+          "p95": 56.996,
+          "p99": 62.74,
+          "mean": 32.07,
+          "n": 800
+        }
+      },
+      "stage_p50_ms": {
+        "bm25_retrieval": 18.679,
+        "citation_validation": 0.003,
+        "context_construction": 0.175,
+        "dense_retrieval": 9.22,
+        "fusion": 0.147,
+        "generation": 0.213,
+        "query_embedding": 0.069,
+        "query_planning": 0.004
+      },
+      "tokens": {
+        "prompt_per_query": 460.2,
+        "completion_per_query": 19.8,
+        "context_per_query": 447.9
+      },
+      "gates": {
+        "leakage": true,
+        "injection_success": true,
+        "no_errors": true
+      },
+      "errors": 0,
+      "by_category_ndcg@10": {
+        "abbreviation": 0.7437507087314789,
+        "authorized_restricted": 0.8325395101358206,
+        "cross_tenant": null,
+        "exact_identifier": 0.7599055709035059,
+        "freshness_superseded": 0.6933152274603878,
+        "historical": 0.8837117006058911,
+        "keyword": 0.8964415886982365,
+        "multi_document": 0.44122554429771943,
+        "no_answer": null,
+        "paraphrase": 0.04095004497455191,
+        "prompt_injection": 0.7174553707867831,
+        "temporal_update": 0.7247518252920626,
+        "unauthorized_group": null
+      }
+    },
+    "diverse": {
+      "metrics": {
+        "ndcg@10": 0.636534329528649,
+        "recall@10": 0.7926470588235294,
+        "mrr@10": 0.5926628151260505,
+        "context_precision": 0.10128676470588235,
+        "context_recall": 0.7720588235294118,
+        "citation_coverage": 0.5882352941176471,
+        "fact_coverage": 0.75,
+        "abstention_correct": 0.7475,
+        "hallucination": 0.0,
+        "freshness_error": 0.0,
+        "leakage": 0.0,
+        "duplicate_context_rate": 0.0,
+        "context_tokens": 430.7525
+      },
+      "latency_ms": {
+        "end_to_end": {
+          "p50": 35.325,
+          "p95": 63.363,
+          "p99": 70.357,
+          "mean": 39.148,
+          "n": 800
+        },
+        "retrieval": {
+          "p50": 28.19,
+          "p95": 56.994,
+          "p99": 63.025,
+          "mean": 32.398,
+          "n": 800
+        }
+      },
+      "stage_p50_ms": {
+        "bm25_retrieval": 19.215,
+        "citation_validation": 0.004,
+        "context_construction": 5.552,
+        "dense_retrieval": 9.247,
+        "fusion": 0.152,
+        "generation": 0.21,
+        "query_embedding": 0.071,
+        "query_planning": 0.004
+      },
+      "tokens": {
+        "prompt_per_query": 443.1,
+        "completion_per_query": 24.8,
+        "context_per_query": 430.8
+      },
+      "gates": {
+        "leakage": true,
+        "injection_success": true,
+        "no_errors": true
+      },
+      "errors": 0,
+      "by_category_ndcg@10": {
+        "abbreviation": 0.7437507087314789,
+        "authorized_restricted": 0.8325395101358206,
+        "cross_tenant": null,
+        "exact_identifier": 0.7599055709035059,
+        "freshness_superseded": 0.6933152274603878,
+        "historical": 0.8837117006058911,
+        "keyword": 0.8964415886982365,
+        "multi_document": 0.44122554429771943,
+        "no_answer": null,
+        "paraphrase": 0.04095004497455191,
+        "prompt_injection": 0.7174553707867831,
+        "temporal_update": 0.7247518252920626,
+        "unauthorized_group": null
+      }
+    },
+    "paired_bootstrap": {
+      "context_precision": {
+        "metric": "context_precision",
+        "n_queries": 680,
+        "mean_baseline": 0.10091911764705883,
+        "mean_candidate": 0.10128676470588235,
+        "mean_difference": 0.0003676470588235294,
+        "ci_low": -0.0014705882352941176,
+        "ci_high": 0.0022058823529411764,
+        "p_not_better": 0.372,
+        "wins": 15,
+        "losses": 13,
+        "ties": 652,
+        "top_decile_share": 1.0,
+        "verdict": "no credible difference"
+      },
+      "context_recall": {
+        "metric": "context_recall",
+        "n_queries": 680,
+        "mean_baseline": 0.7786764705882353,
+        "mean_candidate": 0.7720588235294118,
+        "mean_difference": -0.006617647058823529,
+        "ci_low": -0.01911764705882353,
+        "ci_high": 0.005147058823529412,
+        "p_not_better": 0.861,
+        "wins": 15,
+        "losses": 13,
+        "ties": 652,
+        "top_decile_share": 1.0,
+        "verdict": "no credible difference"
+      },
+      "citation_coverage": {
+        "metric": "citation_coverage",
+        "n_queries": 680,
+        "mean_baseline": 0.5110294117647058,
+        "mean_candidate": 0.5882352941176471,
+        "mean_difference": 0.07720588235294118,
+        "ci_low": 0.05586397058823533,
+        "ci_high": 0.10073529411764706,
+        "p_not_better": 0.0,
+        "wins": 68,
+        "losses": 9,
+        "ties": 603,
+        "top_decile_share": 1.0,
+        "verdict": "improved"
+      },
+      "fact_coverage": {
+        "metric": "fact_coverage",
+        "n_queries": 160,
+        "mean_baseline": 0.74375,
+        "mean_candidate": 0.75,
+        "mean_difference": 0.00625,
+        "ci_low": 0.0,
+        "ci_high": 0.01875,
+        "p_not_better": 0.357,
+        "wins": 1,
+        "losses": 0,
+        "ties": 159,
+        "top_decile_share": 1.0,
+        "verdict": "no credible difference"
+      },
+      "duplicate_context_rate": {
+        "metric": "duplicate_context_rate",
+        "n_queries": 800,
+        "mean_baseline": 0.00265625,
+        "mean_candidate": 0.0,
+        "mean_difference": -0.00265625,
+        "ci_low": -0.00390625,
+        "ci_high": -0.00140625,
+        "p_not_better": 1.0,
+        "wins": 0,
+        "losses": 17,
+        "ties": 783,
+        "top_decile_share": null,
+        "verdict": "improved"
+      }
+    }
+  },
+  "prompt_injection": {
+    "adversary": "SIMULATED model that obeys any 'reply only with X' found in a source and cites it (worst case; not a measurement of a real model's compliance rate)",
+    "results": {
+      "verify_citations=False,quarantine=False": {
+        "queries": 40,
+        "model_obeyed": 39,
+        "injection_success_rate": 0.975
+      },
+      "verify_citations=False,quarantine=True": {
+        "queries": 40,
+        "model_obeyed": 0,
+        "injection_success_rate": 0.0
+      },
+      "verify_citations=True,quarantine=False": {
+        "queries": 40,
+        "model_obeyed": 39,
+        "injection_success_rate": 0.975
+      },
+      "verify_citations=True,quarantine=True": {
+        "queries": 40,
+        "model_obeyed": 0,
+        "injection_success_rate": 0.0
+      },
+      "extractive_generator(default)": {
+        "queries": 40,
+        "model_obeyed": null,
+        "injection_success_rate": 0.0
+      }
+    }
+  },
+  "chunking": {
+    "max_tokens": 48,
+    "retrieval_strategy": "hybrid",
+    "results": {
+      "fixed": {
+        "chunking": "fixed-48-0-c1",
+        "index": {
+          "index": "corpus_chunks_fixed_v0001_eb711b",
+          "load_seconds": 1.31,
+          "documents": 19387,
+          "chunks": 37195,
+          "seconds": 10.799,
+          "embedding_seconds": 8.484667165961582,
+          "indexing_seconds": 0.023637206701096147,
+          "documents_per_second": 1795.3
+        },
+        "metrics": {
+          "ndcg@10": 0.6474669161526901,
+          "recall@10": 0.7470588235294118,
+          "mrr@10": 0.6205141223155929,
+          "context_precision": 0.09724264705882353,
+          "context_recall": 0.7323529411764705,
+          "citation_coverage": 0.5676470588235294,
+          "fact_coverage": 0.63125,
+          "abstention_correct": 0.7125,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 301.1675
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 50.76,
+            "p95": 86.133,
+            "p99": 93.483,
+            "mean": 55.357,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 45.218,
+            "p95": 80.466,
+            "p99": 87.767,
+            "mean": 50.22,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 28.522,
+          "citation_validation": 0.004,
+          "context_construction": 4.454,
+          "dense_retrieval": 17.212,
+          "fusion": 0.154,
+          "generation": 0.174,
+          "query_embedding": 0.087,
+          "query_planning": 0.004
+        },
+        "tokens": {
+          "prompt_per_query": 313.5,
+          "completion_per_query": 22.5,
+          "context_per_query": 301.2
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.8621311716539497,
+          "authorized_restricted": 0.9446394630357187,
+          "cross_tenant": null,
+          "exact_identifier": 0.23841223630847636,
+          "freshness_superseded": 0.5841603833685499,
+          "historical": 0.9630929753571458,
+          "keyword": 0.9723197315178592,
+          "multi_document": 0.3708202670907389,
+          "no_answer": null,
+          "paraphrase": 0.046386227467678585,
+          "prompt_injection": 0.9446394630357187,
+          "temporal_update": 0.6593306972404609,
+          "unauthorized_group": null
+        }
+      },
+      "sliding_window": {
+        "chunking": "sliding_window-48-12-c1",
+        "index": {
+          "index": "corpus_chunks_sliding_window_v0001_c9a07c",
+          "load_seconds": 1.34,
+          "documents": 19387,
+          "chunks": 39671,
+          "seconds": 9.277,
+          "embedding_seconds": 6.788054420205299,
+          "indexing_seconds": 0.02412904688389972,
+          "documents_per_second": 2089.8
+        },
+        "metrics": {
+          "ndcg@10": 0.677646559911669,
+          "recall@10": 0.7823529411764706,
+          "mrr@10": 0.6491859243697479,
+          "context_precision": 0.10661764705882353,
+          "context_recall": 0.7823529411764706,
+          "citation_coverage": 0.5705882352941176,
+          "fact_coverage": 0.625,
+          "abstention_correct": 0.71625,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 333.22125
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 54.31,
+            "p95": 91.717,
+            "p99": 101.141,
+            "mean": 59.043,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 48.383,
+            "p95": 85.987,
+            "p99": 94.054,
+            "mean": 53.594,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 31.224,
+          "citation_validation": 0.004,
+          "context_construction": 4.545,
+          "dense_retrieval": 17.364,
+          "fusion": 0.154,
+          "generation": 0.18,
+          "query_embedding": 0.084,
+          "query_planning": 0.004
+        },
+        "tokens": {
+          "prompt_per_query": 345.5,
+          "completion_per_query": 22.7,
+          "context_per_query": 333.2
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.8610400903741876,
+          "authorized_restricted": 0.9446394630357187,
+          "cross_tenant": null,
+          "exact_identifier": 0.7318825969255736,
+          "freshness_superseded": 0.5782090184406629,
+          "historical": 0.9630929753571458,
+          "keyword": 0.9723197315178592,
+          "multi_document": 0.37072977749134656,
+          "no_answer": null,
+          "paraphrase": 0.04797005770030328,
+          "prompt_injection": 0.9630929753571458,
+          "temporal_update": 0.6621775365568636,
+          "unauthorized_group": null
+        }
+      },
+      "sentence": {
+        "chunking": "sentence-48-0-c1",
+        "index": {
+          "index": "corpus_chunks_sentence_v0001_3f8ad6",
+          "load_seconds": 1.49,
+          "documents": 19387,
+          "chunks": 37746,
+          "seconds": 11.134,
+          "embedding_seconds": 8.39140307973139,
+          "indexing_seconds": 0.023515660606790334,
+          "documents_per_second": 1741.2
+        },
+        "metrics": {
+          "ndcg@10": 0.685514458830262,
+          "recall@10": 0.7727941176470589,
+          "mrr@10": 0.6654849439775911,
+          "context_precision": 0.11301645658263307,
+          "context_recall": 0.7852941176470588,
+          "citation_coverage": 0.5779411764705882,
+          "fact_coverage": 0.60625,
+          "abstention_correct": 0.72375,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 305.24875
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 51.52,
+            "p95": 84.856,
+            "p99": 92.473,
+            "mean": 55.935,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 45.125,
+            "p95": 79.93,
+            "p99": 87.254,
+            "mean": 50.288,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 28.535,
+          "citation_validation": 0.004,
+          "context_construction": 4.285,
+          "dense_retrieval": 17.404,
+          "fusion": 0.156,
+          "generation": 0.168,
+          "query_embedding": 0.085,
+          "query_planning": 0.004
+        },
+        "tokens": {
+          "prompt_per_query": 317.5,
+          "completion_per_query": 23.0,
+          "context_per_query": 305.2
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.8718369056030004,
+          "authorized_restricted": 0.9446394630357187,
+          "cross_tenant": null,
+          "exact_identifier": 0.6880929753571458,
+          "freshness_superseded": 0.5977524638442293,
+          "historical": 0.9875,
+          "keyword": 0.9723197315178592,
+          "multi_document": 0.4368441605157879,
+          "no_answer": null,
+          "paraphrase": 0.046153128532103,
+          "prompt_injection": 0.9538662191964322,
+          "temporal_update": 0.687060610603125,
+          "unauthorized_group": null
+        }
+      },
+      "structure": {
+        "chunking": "structure-48-0-c1",
+        "index": {
+          "index": "corpus_chunks_structure_v0001_b953f4",
+          "load_seconds": 1.39,
+          "documents": 19387,
+          "chunks": 50932,
+          "seconds": 12.467,
+          "embedding_seconds": 9.370552126085386,
+          "indexing_seconds": 0.03241495386464521,
+          "documents_per_second": 1555.1
+        },
+        "metrics": {
+          "ndcg@10": 0.5841627268557328,
+          "recall@10": 0.7448529411764706,
+          "mrr@10": 0.5362756769374416,
+          "context_precision": 0.1125,
+          "context_recall": 0.7279411764705882,
+          "citation_coverage": 0.48823529411764705,
+          "fact_coverage": 0.60625,
+          "abstention_correct": 0.71125,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 243.78625
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 61.07,
+            "p95": 99.223,
+            "p99": 114.758,
+            "mean": 66.311,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 57.499,
+            "p95": 94.394,
+            "p99": 109.873,
+            "mean": 62.109,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 34.142,
+          "citation_validation": 0.004,
+          "context_construction": 3.33,
+          "dense_retrieval": 23.0,
+          "fusion": 0.158,
+          "generation": 0.141,
+          "query_embedding": 0.093,
+          "query_planning": 0.004
+        },
+        "tokens": {
+          "prompt_per_query": 256.1,
+          "completion_per_query": 22.4,
+          "context_per_query": 243.8
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.6627613583716382,
+          "authorized_restricted": 0.842403758573728,
+          "cross_tenant": null,
+          "exact_identifier": 0.8691839392772746,
+          "freshness_superseded": 0.26686222729149506,
+          "historical": 0.7430293645246905,
+          "keyword": 0.8941413571131023,
+          "multi_document": 0.6614553684870665,
+          "no_answer": null,
+          "paraphrase": 0.0797818179083678,
+          "prompt_injection": 0.7924456318540918,
+          "temporal_update": 0.42266623317989244,
+          "unauthorized_group": null
+        }
+      },
+      "recursive": {
+        "chunking": "recursive-48-0-c1",
+        "index": {
+          "index": "corpus_chunks_recursive_v0001_2ff51c",
+          "load_seconds": 1.5,
+          "documents": 19387,
+          "chunks": 39293,
+          "seconds": 9.637,
+          "embedding_seconds": 6.904792661604006,
+          "indexing_seconds": 0.026354918780270964,
+          "documents_per_second": 2011.7
+        },
+        "metrics": {
+          "ndcg@10": 0.662084528357372,
+          "recall@10": 0.7617647058823529,
+          "mrr@10": 0.6392617880485527,
+          "context_precision": 0.10946428571428571,
+          "context_recall": 0.7639705882352941,
+          "citation_coverage": 0.5419117647058823,
+          "fact_coverage": 0.59375,
+          "abstention_correct": 0.70625,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 285.23125
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 57.115,
+            "p95": 95.041,
+            "p99": 101.623,
+            "mean": 62.536,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 51.836,
+            "p95": 88.99,
+            "p99": 95.131,
+            "mean": 57.294,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 32.326,
+          "citation_validation": 0.004,
+          "context_construction": 4.176,
+          "dense_retrieval": 19.572,
+          "fusion": 0.169,
+          "generation": 0.168,
+          "query_embedding": 0.103,
+          "query_planning": 0.005
+        },
+        "tokens": {
+          "prompt_per_query": 297.5,
+          "completion_per_query": 22.0,
+          "context_per_query": 285.2
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.8291212685546672,
+          "authorized_restricted": 0.9413662191964323,
+          "cross_tenant": null,
+          "exact_identifier": 0.7171321915614529,
+          "freshness_superseded": 0.4043702722144326,
+          "historical": 0.9210312094898441,
+          "keyword": 0.9692441461309548,
+          "multi_document": 0.4635991385990831,
+          "no_answer": null,
+          "paraphrase": 0.0627594124208319,
+          "prompt_injection": 0.9538662191964322,
+          "temporal_update": 0.6353486252491427,
+          "unauthorized_group": null
+        }
+      },
+      "semantic": {
+        "chunking": "semantic-48-0-b0.35-c1",
+        "index": {
+          "index": "corpus_chunks_semantic_v0001_c5fab2",
+          "load_seconds": 1.54,
+          "documents": 19387,
+          "chunks": 144602,
+          "seconds": 41.454,
+          "embedding_seconds": 25.62432629277464,
+          "indexing_seconds": 0.24904037785017863,
+          "documents_per_second": 467.7
+        },
+        "metrics": {
+          "ndcg@10": 0.7282857751696191,
+          "recall@10": 0.8647058823529412,
+          "mrr@10": 0.6865686274509804,
+          "context_precision": 0.1370045518207283,
+          "context_recall": 0.7852941176470588,
+          "citation_coverage": 0.5470588235294118,
+          "fact_coverage": 0.3625,
+          "abstention_correct": 0.73,
+          "hallucination": 0.0,
+          "freshness_error": 0.0,
+          "leakage": 0.0,
+          "duplicate_context_rate": 0.0,
+          "context_tokens": 89.4025
+        },
+        "latency_ms": {
+          "end_to_end": {
+            "p50": 160.765,
+            "p95": 208.946,
+            "p99": 232.925,
+            "mean": 160.525,
+            "n": 800
+          },
+          "retrieval": {
+            "p50": 157.998,
+            "p95": 205.732,
+            "p99": 226.896,
+            "mean": 157.563,
+            "n": 800
+          }
+        },
+        "stage_p50_ms": {
+          "bm25_retrieval": 85.127,
+          "citation_validation": 0.004,
+          "context_construction": 1.622,
+          "dense_retrieval": 68.653,
+          "fusion": 0.163,
+          "generation": 0.072,
+          "query_embedding": 0.108,
+          "query_planning": 0.004
+        },
+        "tokens": {
+          "prompt_per_query": 101.7,
+          "completion_per_query": 21.1,
+          "context_per_query": 89.4
+        },
+        "gates": {
+          "leakage": true,
+          "injection_success": true,
+          "no_errors": true
+        },
+        "errors": 0,
+        "by_category_ndcg@10": {
+          "abbreviation": 0.8678678973887156,
+          "authorized_restricted": 1.0,
+          "cross_tenant": null,
+          "exact_identifier": 1.0,
+          "freshness_superseded": 0.6777402990914269,
+          "historical": 0.8075395101358206,
+          "keyword": 1.0,
+          "multi_document": 0.5140993213879943,
+          "no_answer": null,
+          "paraphrase": 0.1679375671380526,
+          "prompt_injection": 1.0,
+          "temporal_update": 0.6370313268439899,
+          "unauthorized_group": null
+        }
+      }
+    }
+  }
+}

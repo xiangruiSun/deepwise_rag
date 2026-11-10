@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inspect-rag
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inspect-rag-config
+  namespace: inspect-rag
+data:
+  INSPECT_RAG_ENVIRONMENT: production
+  INSPECT_RAG_SEARCH_BACKEND: elasticsearch
+  INSPECT_RAG_ELASTICSEARCH_URL: https://elasticsearch.search.svc:9200
+  INSPECT_RAG_CORPUS_CONFIG: corpus_production.yaml
+  INSPECT_RAG_ARTIFACT_DIR: /srv/artifacts
+  INSPECT_RAG_REQUEST_TIMEOUT_SECONDS: "60"
+  INSPECT_RAG_LOG_LEVEL: INFO
+  INSPECT_RAG_OTEL_ENABLED: "true"

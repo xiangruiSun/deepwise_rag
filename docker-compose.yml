@@ -2,6 +2,8 @@
 #   docker compose up -d                      # postgres, elasticsearch, backend, frontend
 #   docker compose --profile llm up -d        # + local Ollama server (then: make pull-llm)
 #   docker compose --profile tracking up -d   # + MLflow tracking server
+#   docker compose --profile platform up -d   # + corpus platform: Redis, Redpanda, MinIO, workers
+#   docker compose --profile monitoring up -d # + Prometheus and Grafana (http://localhost:3000)
 # Ports are bound to 127.0.0.1 only. Elasticsearch security is disabled for LOCAL development;
 # enable TLS and authentication before exposing it to any network.
 name: inspect-rag
@@ -36,10 +38,10 @@ services:
       retries: 30
 
   backend:
-    build:
+    build: &backend-build
       context: .
       dockerfile: backend/Dockerfile
-    environment:
+    environment: &backend-env
       INSPECT_RAG_ENVIRONMENT: ${INSPECT_RAG_ENVIRONMENT:-development}
       INSPECT_RAG_APP_CONFIG: ${INSPECT_RAG_APP_CONFIG:-synthetic.yaml}
       INSPECT_RAG_DATABASE_URL: postgresql+psycopg://inspect_rag:${POSTGRES_PASSWORD}@postgres:5432/inspect_rag
@@ -52,11 +54,14 @@ services:
       INSPECT_RAG_MLFLOW_TRACKING_URI: ${INSPECT_RAG_MLFLOW_TRACKING_URI:-}
       INSPECT_RAG_OLLAMA_BASE_URL: ${INSPECT_RAG_OLLAMA_BASE_URL:-http://ollama:11434}
       INSPECT_RAG_REQUEST_TIMEOUT_SECONDS: ${INSPECT_RAG_REQUEST_TIMEOUT_SECONDS:-60}
-    volumes:
+      INSPECT_RAG_CORPUS_CONFIG: ${INSPECT_RAG_CORPUS_CONFIG:-corpus.yaml}
+      INSPECT_RAG_DEV_TENANT: ${INSPECT_RAG_DEV_TENANT:-tenant-000}
+      INSPECT_RAG_LLM_API_KEY: ${INSPECT_RAG_LLM_API_KEY:-}
+    volumes: &backend-volumes
       - ./configs:/srv/configs:ro
       - ./data:/srv/data            # synthetic fixtures are generated here; mount INSPECT read-only yourself
       - artifacts:/srv/artifacts
-    depends_on:
+    depends_on: &backend-depends
       postgres: {condition: service_healthy}
       elasticsearch: {condition: service_healthy}
     ports: ["127.0.0.1:8000:8000"]
@@ -85,7 +90,95 @@ services:
     ports: ["127.0.0.1:5000:5000"]
     volumes: [mlflow:/mlflow]
 
+  # ---------------------------------------------------------------- corpus platform
+  # Workers share the backend image and environment.  They are separate processes so that
+  # offline batch work and index maintenance never compete with online requests for a worker.
+  corpus-indexer:
+    profiles: ["platform"]
+    build: *backend-build
+    command: ["python", "-m", "app.cli", "corpus", "events", "process", "--loop"]
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on: *backend-depends
+    restart: unless-stopped
+
+  corpus-batch-worker:
+    profiles: ["platform"]
+    build: *backend-build
+    command: ["python", "-m", "app.cli", "corpus", "batch", "work", "--loop"]
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on: *backend-depends
+    restart: unless-stopped
+
+  corpus-scheduler:
+    profiles: ["platform"]
+    build: *backend-build
+    command: ["python", "-m", "app.cli", "corpus", "schedule", "run"]
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on: *backend-depends
+    restart: unless-stopped
+
+  redis:                      # retrieval / query-embedding cache (configs: cache.backend=redis)
+    profiles: ["platform"]
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redpanda:                   # Kafka-compatible change-event topic (corpus events process --kafka redpanda:9092)
+    profiles: ["platform"]
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports: ["127.0.0.1:19092:19092"]
+    volumes: [redpanda:/var/lib/redpanda/data]
+
+  minio:                      # S3-compatible object storage for raw files, normalised data and batch outputs
+    profiles: ["platform"]
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-inspect-rag}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-minio}   # local development only
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: [minio:/data]
+
+  # ---------------------------------------------------------------------- monitoring
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-grafana}   # local development only
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+    ports: ["127.0.0.1:3000:3000"]
+
 volumes:
+  redpanda:
+  minio:
   pgdata:
   esdata:
   artifacts:

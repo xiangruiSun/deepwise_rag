@@ -1,0 +1,39 @@
+{
+  "what": "commit of a change event -> change visible to a query (one event per processor batch)",
+  "excludes": "the indexer worker's poll interval (adds up to one interval)",
+  "search_backend": "elasticsearch",
+  "database": "postgresql+psycopg",
+  "rounds": 30,
+  "visibility_lag_ms": {
+    "insert": {
+      "p50": 78.5,
+      "p95": 92.7,
+      "max": 153.8,
+      "n": 30
+    },
+    "update": {
+      "p50": 85.5,
+      "p95": 96.6,
+      "max": 147.1,
+      "n": 30
+    },
+    "delete": {
+      "p50": 61.6,
+      "p95": 73.6,
+      "max": 92.5,
+      "n": 30
+    }
+  },
+  "processor_batch_ms": {
+    "p50": 69.5,
+    "p95": 83.4,
+    "max": 133.1,
+    "n": 90
+  },
+  "configured_bound_seconds": 120.0,
+  "pending_after": {
+    "upserts": 0,
+    "deletes": 0
+  },
+  "consistent_after": true
+}

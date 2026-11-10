@@ -37,7 +37,7 @@ def test_index_is_versioned_validated_and_supports_exact_lookup(corpus: Corpus) 
     indexes = corpus.runtime.indexes
     health = indexes.health()
     name = health["active"]
-    assert name and name.startswith("corpus_chunks_v0001") and health["pending"] == {"upserts": 0, "deletes": 0}
+    assert name and name.startswith(f"{corpus.runtime.config.index_prefix}_v0001") and health["pending"] == {"upserts": 0, "deletes": 0}
     spec = corpus.runtime.backend.index_spec(name)
     assert spec.kind == "chunks" and spec.meta["embedding_identity"] == indexes.embedding_identity
     assert spec.meta["chunking_identity"] == corpus.runtime.config.chunking.identity
@@ -65,7 +65,7 @@ def test_safe_reindex_activation_gate_rollback_and_drift_repair(corpus: Corpus, 
     assert indexes.validate(first)["valid"]
     indexes.activate(first)
     # a new chunking configuration means a new index version, built next to the active one
-    changed = corpus_config(chunking=CorpusChunkingConfig(strategy="sentence", max_tokens=40))
+    changed = runtime.config.model_copy(update={"chunking": CorpusChunkingConfig(strategy="sentence", max_tokens=40)})
     runtime2, _ = build_runtime(tmp_path, changed, runtime.session_factory)
     runtime2.backend = backend
     runtime2.indexes.backend = backend

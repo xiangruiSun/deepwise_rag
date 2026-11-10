@@ -16,10 +16,39 @@ from typing import Any
 from app.corpus.config import ContextParams
 from app.corpus.retrieval import AuthContext, RetrievedChunk
 from app.corpus.schema import make_chunk_id
+from app.corpus.telemetry import INJECTION_QUARANTINED
 from app.indexing.backend import SearchBackend
 from app.rag.evidence import estimate_tokens, neutralize
 
 _WORD = re.compile(r"[a-z0-9]+")
+# Sentences of a retrieved document that talk to the model instead of describing a patient.
+_INSTRUCTION = re.compile(
+    r"\b(?:ignore|disregard|forget|override)\b[^.!?\n]{0,40}\b(?:previous|prior|above|earlier|all|any|system)\b"
+    r"[^.!?\n]{0,40}\b(?:instruction|prompt|rule|direction|message)s?\b"
+    r"|\b(?:reply|respond|answer|output|print|say)\s+(?:only\s+with|with\s+only|exactly)\b"
+    r"|\byou\s+are\s+now\b|\bnew\s+instructions?\s*:"
+    r"|\b(?:reveal|print|show|leak|repeat)\b[^.!?\n]{0,30}\b(?:system\s+prompt|hidden\s+instructions?|api\s+keys?)\b",
+    re.IGNORECASE)
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+WITHHELD = "[instruction-like text withheld]"
+
+
+def quarantine_instructions(text: str) -> tuple[str, int]:
+    """Replace instruction-like sentences by a placeholder; returns the text and how many were withheld.
+
+    A heuristic, and deliberately conservative in what it removes (one sentence at a time, never a
+    whole chunk).  It is one layer: the prompt marks sources as untrusted, citation markers are
+    neutralised, and the verifier releases only sentences supported by the *remaining* text."""
+    if not _INSTRUCTION.search(text):
+        return text, 0
+    kept, withheld = [], 0
+    for sentence in _SENTENCE.split(text):
+        if _INSTRUCTION.search(sentence):
+            withheld += 1
+            kept.append(WITHHELD)
+        elif sentence:
+            kept.append(sentence)
+    return " ".join(kept), withheld
 
 
 @dataclass
@@ -37,6 +66,7 @@ class ContextBundle:
     token_budget: int
     dropped: dict[str, int] = field(default_factory=dict)
     selection: str = "top_k"
+    quarantined: int = 0
 
     def by_source(self) -> dict[str, ContextItem]:
         return {item.source_id: item for item in self.items}
@@ -55,7 +85,8 @@ class ContextBundle:
         duplicates = sum(1 for a, b in pairs if _jaccard(a, b) >= 0.85)
         return {"chunks": len(self.items), "tokens": self.tokens_used, "budget": self.token_budget,
                 "documents": len({i.chunk.document_id for i in self.items}),
-                "duplicate_pairs": duplicates, "dropped": self.dropped, "selection": self.selection}
+                "duplicate_pairs": duplicates, "dropped": self.dropped, "selection": self.selection,
+                "quarantined_sentences": self.quarantined}
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -121,18 +152,23 @@ def select_context(chunks: list[RetrievedChunk], params: ContextParams, final_k:
         chosen.sort(key=lambda c: order[c.chunk_id])
 
     items: list[ContextItem] = []
-    used = 0
+    used = quarantined = 0
     selected_ids = {c.chunk_id for c in chosen}
     for n, chunk in enumerate(chosen, start=1):
         text = chunk.text
         if params.parent_expansion and backend is not None and index is not None:
             text = _expand(chunk, backend, index, auth, selected_ids, params.token_budget - used)
         text = neutralize(text)
+        if params.quarantine_instructions:
+            text, withheld = quarantine_instructions(text)
+            quarantined += withheld
         tokens = estimate_tokens(text)
         items.append(ContextItem(f"S{n}", chunk, text, tokens))
         used += tokens
+    if quarantined:
+        INJECTION_QUARANTINED.inc(quarantined)
     return ContextBundle(items, used, params.token_budget, {k: v for k, v in dropped.items() if v},
-                         params.selection)
+                         params.selection, quarantined)
 
 
 def _expand(chunk: RetrievedChunk, backend: SearchBackend, index: str, auth: AuthContext | None,

@@ -1,0 +1,29 @@
+{
+  "what": "index build on Elasticsearch 8.15.3 (Docker, single node) from a PostgreSQL 16 registry",
+  "corpus": "synthetic, 21,797 source rows -> 19,387 live documents -> 19,760 chunks",
+  "embedding": "hashing-ngram-v1, 384 dimensions (CPU stand-in, no model)",
+  "registry_load": {
+    "rows_read": 21797,
+    "documents_inserted": 19387,
+    "seconds": 1.509
+  },
+  "build": {
+    "chunks": 19760,
+    "documents": 19387,
+    "documents_per_second": 1355.5,
+    "embedding_seconds": 6.475,
+    "indexing_seconds": 6.182,
+    "seconds": 14.302
+  },
+  "index": {
+    "size_bytes": 40076171,
+    "bytes_per_chunk": 2028.1,
+    "health": "green"
+  },
+  "validation": {
+    "valid": true,
+    "sampled": 50,
+    "problems": []
+  },
+  "note": "one workstation (arm64, 12 cores); Elasticsearch heap 1 GB; not a sizing measurement for production hardware"
+}

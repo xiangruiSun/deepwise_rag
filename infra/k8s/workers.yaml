@@ -1,0 +1,70 @@
+# Workers run the same image as the API but never serve requests: indexing and offline batch
+# inference cannot starve online traffic of CPU, connections or model-server slots.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: corpus-indexer
+  namespace: inspect-rag
+  labels: {app: corpus-indexer}
+spec:
+  replicas: 1          # the registry makes processing idempotent; one consumer per partition keeps order simple
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: corpus-indexer}
+  template:
+    metadata:
+      labels: {app: corpus-indexer}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000}
+      containers:
+        - name: indexer
+          image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+          command: ["python", "-m", "app.cli", "corpus", "events", "process", "--loop",
+                    "--kafka", "kafka.messaging.svc:9092", "--topic", "corpus.document-changes"]
+          envFrom: [{configMapRef: {name: inspect-rag-config}}]
+          env:
+            - name: INSPECT_RAG_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+            - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {memory: 8Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: corpus-batch-worker
+  namespace: inspect-rag
+  labels: {app: corpus-batch-worker}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: corpus-batch-worker}
+  template:
+    metadata:
+      labels: {app: corpus-batch-worker}
+    spec:
+      priorityClassName: batch-low        # must exist in the cluster; preempted before online pods
+      terminationGracePeriodSeconds: 120  # finish the batch in flight; an interrupted job resumes anyway
+      securityContext: {runAsNonRoot: true, runAsUser: 1000}
+      containers:
+        - name: worker
+          image: registry.example.com/inspect-rag-backend:REPLACE_WITH_IMAGE_TAG
+          command: ["python", "-m", "app.cli", "corpus", "batch", "work", "--loop"]
+          envFrom: [{configMapRef: {name: inspect-rag-config}}]
+          env:
+            - name: INSPECT_RAG_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: database-url}}
+            - name: INSPECT_RAG_ELASTICSEARCH_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: elasticsearch-api-key}}
+            - name: INSPECT_RAG_LLM_API_KEY
+              valueFrom: {secretKeyRef: {name: inspect-rag-secrets, key: llm-api-key}}
+          resources:
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {memory: 4Gi}
+          volumeMounts:
+            - {name: batch, mountPath: /srv/artifacts}
+      volumes:
+        - name: batch
+          persistentVolumeClaim: {claimName: corpus-batch-outputs}   # shared (RWX) or replace with object storage

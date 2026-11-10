@@ -6,14 +6,15 @@ httpx==0.28.1
 numpy==2.2.6
 pandas==3.1.1
 prometheus_client==0.26.0
-psycopg==3.3.8
 psycopg-binary==3.3.8
+psycopg==3.3.8
 pyarrow==26.0.1
-pydantic==2.14.3
 pydantic-settings==2.16.2
+pydantic==2.14.3
 pydantic_core==2.50.4
 pydicom==3.0.2
 PyYAML==6.0.3
+redis==8.1.0
 scipy==1.17.1
 SQLAlchemy==2.1.8
 starlette==1.10.0

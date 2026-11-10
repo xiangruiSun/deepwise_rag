@@ -1,0 +1,50 @@
+# Alert thresholds are STARTING POINTS for an operator to tune against their own service-level
+# objectives; none of them is a measured property of this system.
+groups:
+  - name: corpus-platform
+    rules:
+      - alert: CorpusQueryLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(corpus_query_latency_seconds_bucket[5m])) by (le)) > 3
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "P95 RAG query latency above 3 s for 10 minutes"
+          runbook: "docs/enterprise/runbook.md#latency"
+      - alert: CorpusIndexFreshnessLag
+        expr: corpus_index_freshness_lag_seconds > 300
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "Oldest unprocessed document change is older than 5 minutes"
+          runbook: "docs/enterprise/runbook.md#index-lag"
+      - alert: CorpusIndexBacklog
+        expr: sum(corpus_index_pending_documents) > 10000
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "More than 10,000 documents are waiting to be indexed"
+      - alert: CorpusLlmCircuitOpen
+        expr: increase(corpus_llm_requests_total{outcome="circuit_open"}[5m]) > 0
+        labels: {severity: page}
+        annotations:
+          summary: "The model server circuit breaker is open; answers are degraded to extractive"
+          runbook: "docs/enterprise/runbook.md#model-server"
+      - alert: CorpusLlmBackpressure
+        expr: rate(corpus_llm_requests_total{outcome="rejected_overload"}[5m]) > 0.1
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Requests are being rejected (429) because the generation queue is full"
+      - alert: CorpusDeadLetterEvents
+        expr: increase(corpus_events_total{outcome="dead_letter"}[1h]) > 0
+        labels: {severity: ticket}
+        annotations:
+          summary: "Change events were dead-lettered in the last hour"
+          runbook: "docs/enterprise/runbook.md#dead-letters"
+      - alert: CorpusAbstentionRateShift
+        expr: >
+          sum(rate(corpus_queries_total{outcome="abstained"}[1h])) / sum(rate(corpus_queries_total[1h])) > 0.5
+        for: 1h
+        labels: {severity: ticket}
+        annotations:
+          summary: "More than half of the queries abstain; check index health and recent deployments"

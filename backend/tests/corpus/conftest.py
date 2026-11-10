@@ -1,10 +1,19 @@
 """Fixtures of the document-corpus platform: a small synthetic corpus, ingested and indexed.
 
-Hermetic: in-memory SQLite, the in-process search backend, hashing embeddings, no model."""
+Hermetic by default: in-memory SQLite, the in-process search backend, hashing embeddings, no model.
+
+Live mode (same switches as the rest of the suite): with INSPECT_RAG_TEST_DATABASE_URL every
+registry is a fresh PostgreSQL database whose schema is created by the Alembic migrations, and
+with INSPECT_RAG_TEST_ELASTICSEARCH_URL every runtime indexes into uniquely prefixed
+Elasticsearch indexes.  Both are removed at session end."""
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,7 +28,8 @@ from app.corpus.generator import write_dataset
 from app.corpus.retrieval import AuthContext
 from app.corpus.runtime import CorpusRuntime, build_corpus_runtime
 from app.db.base import create_all, make_engine, make_session_factory
-from app.indexing.backend import LocalSearchBackend
+from app.indexing.backend import LocalSearchBackend, SearchBackend
+from tests.conftest import _LIVE_INDEX_PREFIXES, LIVE_DB_URL, LIVE_ES_URL, _live_database_url
 
 CONFIG_DIR = Path(__file__).resolve().parents[3] / "configs"
 N_RECORDS, N_GOLDEN = 900, 100
@@ -45,6 +55,12 @@ def corpus_config(**updates: Any) -> CorpusConfig:
 
 
 def new_session_factory() -> sessionmaker[Session]:
+    if LIVE_DB_URL:
+        url = _live_database_url()
+        # the schema comes from the migrations, exactly as in a PostgreSQL deployment
+        subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True, capture_output=True,
+                       cwd=Path(__file__).resolve().parents[2], env={**os.environ, "INSPECT_RAG_DATABASE_URL": url})
+        return make_session_factory(make_engine(url))
     engine = make_engine("sqlite://")
     create_all(engine)
     return make_session_factory(engine)
@@ -53,9 +69,19 @@ def new_session_factory() -> sessionmaker[Session]:
 def build_runtime(tmp: Path, config: CorpusConfig | None = None,
                   session_factory: sessionmaker[Session] | None = None) -> tuple[CorpusRuntime, Settings]:
     settings = Settings(database_url="sqlite://", artifact_dir=tmp / "artifacts", config_dir=CONFIG_DIR,
-                        environment="test")
-    runtime = build_corpus_runtime(settings, session_factory or new_session_factory(), LocalSearchBackend(),
-                                   config or corpus_config())
+                        environment="test", search_backend="elasticsearch" if LIVE_ES_URL else "local",
+                        elasticsearch_url=LIVE_ES_URL or "http://localhost:9200")
+    config = config or corpus_config()
+    backend: SearchBackend = LocalSearchBackend()
+    if LIVE_ES_URL:
+        from app.indexing.es_backend import ElasticsearchBackend
+
+        backend = ElasticsearchBackend(settings)
+        if not config.index_prefix.startswith("irt"):  # a runtime that shares another one's indexes keeps its prefix
+            prefix = f"irt{uuid.uuid4().hex[:8]}_"
+            _LIVE_INDEX_PREFIXES.append(prefix)
+            config = config.model_copy(update={"index_prefix": prefix + config.index_prefix})
+    runtime = build_corpus_runtime(settings, session_factory or new_session_factory(), backend, config)
     return runtime, settings
 
 

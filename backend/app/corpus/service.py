@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.errors import AppError, DependencyUnavailable, RequestTimeout
 from app.core.hashing import sha256_text, stable_hash
+from app.corpus.analysis import detect_conflicts
 from app.corpus.cache import CorpusCache
 from app.corpus.config import CorpusConfig
 from app.corpus.context import ContextBundle, select_context
@@ -129,7 +130,10 @@ class CorpusService:
 
     def build_context(self, auth: AuthContext, result: RetrievalResult, timer: StageTimer) -> ContextBundle:
         with stage(timer, "context_construction") as span:
-            bundle = select_context(result.chunks, self.config.context, result.params.final_k,
+            params = self.config.context
+            if result.params.context_selection is not None:
+                params = params.model_copy(update={"selection": result.params.context_selection})
+            bundle = select_context(result.chunks, params, result.params.final_k,
                                     self.retriever.backend, result.index_version, auth)
             span["chunks"], span["tokens"] = len(bundle.items), bundle.tokens_used
         return bundle
@@ -249,6 +253,9 @@ class CorpusService:
         INFERENCE_TOKENS.labels(direction="output").inc(generation.completion_tokens)
         if generation.mock:
             warnings.append("MOCK GENERATION: no language model is configured; this is not a model answer")
+        conflicts = detect_conflicts(bundle) if self.config.context.detect_conflicts else []
+        if conflicts:
+            warnings.append(f"{len(conflicts)} pair(s) of retrieved sources appear to disagree; see 'conflicts'")
         yield {"event": "done", "data": {
             "answer": generation.text, "sentences": generation.sentences, "citations": citations,
             "abstained": generation.abstained, "abstention_reason": generation.abstention_reason,
@@ -263,7 +270,7 @@ class CorpusService:
             "context": bundle.stats(), "retrieved_chunks": [c.chunk.chunk_id for c in bundle.items],
             "context_documents": [c.chunk.document_id for c in bundle.items],
             "ranked_documents": list(dict.fromkeys(c.document_id for c in result.chunks)),
-            "candidates": result.candidates,
+            "candidates": result.candidates, "conflicts": conflicts,
             "removed_sentences": generation.removed_sentences,
             "invalid_citations": sorted(set(generation.invalid_citations)),
             "mock": generation.mock, "degraded": degraded, "cache_hit": result.cache_hit,

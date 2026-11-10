@@ -10,7 +10,13 @@ NEURAL_SUITES := experiments/embedding_comparison.yaml experiments/chunking_comp
 
 .DEFAULT_GOAL := help
 .PHONY: help setup setup-ml up down up-llm pull-llm migrate test test-neural lint seed-synthetic index-baseline \
-        run-baseline run-experiments run-neural-experiments select report serve frontend e2e-prepare e2e clean
+        run-baseline run-experiments run-neural-experiments select report serve frontend e2e-prepare e2e clean \
+        up-platform up-monitoring test-security ingest-demo reindex index-sync index-check batch-demo eval \
+        experiments benchmark loadtest capacity
+CORPUS_DATA ?= data/corpus_synthetic
+CORPUS_RECORDS ?= 20000
+BENCH_URL ?= http://127.0.0.1:8000
+BENCH_KEYS ?= loadtest/keys.example.json
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-24s %s\n", $$1, $$2}'
@@ -84,6 +90,53 @@ e2e-prepare: seed-synthetic index-baseline run-baseline ## Prepare data for the 
 
 e2e: ## Run the Playwright end-to-end tests (after e2e-prepare; needs `npx playwright install chromium`)
 	cd frontend && E2E_PYTHON=$(PY) npx playwright test
+
+# ---------------------------------------------------------------- corpus platform (app/corpus)
+up-platform: ## Start the stack plus Redis, Redpanda, MinIO and the corpus workers
+	docker compose --profile platform up -d --build
+
+up-monitoring: ## Start Prometheus and Grafana (http://localhost:3000)
+	docker compose --profile monitoring up -d
+
+test-security: ## Release gates: tenant isolation, access control, prompt injection
+	cd backend && $(PY) -m pytest -m security -q
+
+ingest-demo: ## Generate a SYNTHETIC document corpus (CORPUS_RECORDS=20000) and ingest it
+	$(CLI) corpus generate --records $(CORPUS_RECORDS) --output ../$(CORPUS_DATA)
+	$(CLI) corpus ingest --source ../$(CORPUS_DATA)/raw
+
+reindex: ## Build a new corpus index version, validate it and switch the alias
+	$(CLI) corpus index build
+
+index-sync: ## Apply pending document changes and change events to the active index
+	$(CLI) corpus events process
+	$(CLI) corpus index sync
+
+index-check: ## Compare the registry with the active index (add REPAIR=1 to repair)
+	$(CLI) corpus index check $(if $(REPAIR),--repair,)
+
+batch-demo: ## Run an offline RAG job over the demo evaluation questions
+	$(CLI) corpus batch submit ../$(CORPUS_DATA)/eval/queries.jsonl
+	$(CLI) corpus batch work
+
+eval: ## Compare retrieval strategies on the demo evaluation set (fails when a release gate fails)
+	$(CLI) corpus eval run --dataset ../$(CORPUS_DATA)/eval/queries.jsonl --baseline bm25
+
+experiments: ## Before/after experiments (ablation, context, chunking, injection) -> experiments/enterprise/
+	cd backend && $(PY) ../scripts/enterprise_experiments.py --config corpus.yaml --records $(CORPUS_RECORDS) \
+	    --work-dir ../artifacts/corpus_experiments --out ../experiments/enterprise/hashing
+
+benchmark: ## Concurrency sweep against a RUNNING API (BENCH_URL, BENCH_KEYS)
+	$(PY) scripts/corpus_benchmark.py --base-url $(BENCH_URL) --keys $(BENCH_KEYS) \
+	    --queries $(CORPUS_DATA)/eval/queries.jsonl --out experiments/enterprise/benchmarks/api.json
+
+loadtest: ## Locust load test against a RUNNING API (needs the 'load' extra)
+	CORPUS_QUERIES=$(CORPUS_DATA)/eval/queries.jsonl CORPUS_KEYS=$(BENCH_KEYS) $(PY) -m locust \
+	    -f loadtest/locustfile.py --host $(BENCH_URL) --headless -u 20 -r 5 -t 60s \
+	    --csv experiments/enterprise/benchmarks/locust
+
+capacity: ## Storage / shard / embedding-time estimate for 100M records (inputs are assumptions)
+	$(CLI) corpus capacity --records 100000000
 
 clean: ## Remove generated artifacts and synthetic data (never touches data/inspect)
 	rm -rf artifacts data/synthetic/* backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache

@@ -1,0 +1,229 @@
+{
+  "label": "PostgreSQL + Elasticsearch, retrieval cache OFF, extractive generator, 1 uvicorn worker",
+  "base_url": "http://127.0.0.1:8010",
+  "strategy": "default",
+  "distinct_queries": 760,
+  "requests_per_level": 800,
+  "readiness": {
+    "status": "ready",
+    "checks": {
+      "database": "ok",
+      "search": "ok",
+      "index": "ok",
+      "cache": "ok",
+      "llm": "ok (extractive generator, no model)"
+    },
+    "active_index": "corpus_bench_chunks_v0001_333251",
+    "model_version": "extractive:extractive-v1:corpus-p1",
+    "generation_backend": "extractive"
+  },
+  "client": {
+    "machine": "arm64",
+    "platform": "macOS-15.5-arm64-arm-64bit",
+    "note": "client and server ran on the same machine"
+  },
+  "query": [
+    {
+      "concurrency": 1,
+      "requests": 800,
+      "seconds": 17.346,
+      "throughput_rps": 46.12,
+      "statuses": {
+        "200": 800
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 26.27,
+        "p95": 31.6,
+        "p99": 35.05,
+        "mean": 21.65,
+        "max": 51.46
+      },
+      "cache_hit_rate": 0.0,
+      "abstention_rate": 0.2838,
+      "server_side_ms": {
+        "p50": 21.85,
+        "p95": 25.75,
+        "p99": 28.4,
+        "mean": 17.44,
+        "max": 46.89
+      }
+    },
+    {
+      "concurrency": 4,
+      "requests": 800,
+      "seconds": 10.745,
+      "throughput_rps": 74.45,
+      "statuses": {
+        "200": 800
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 59.92,
+        "p95": 88.36,
+        "p99": 102.17,
+        "mean": 53.6,
+        "max": 121.47
+      },
+      "cache_hit_rate": 0.0,
+      "abstention_rate": 0.2838,
+      "server_side_ms": {
+        "p50": 41.87,
+        "p95": 67.67,
+        "p99": 82.5,
+        "mean": 38.98,
+        "max": 92.11
+      }
+    },
+    {
+      "concurrency": 16,
+      "requests": 800,
+      "seconds": 10.194,
+      "throughput_rps": 78.48,
+      "statuses": {
+        "200": 800
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 204.26,
+        "p95": 298.93,
+        "p99": 350.45,
+        "mean": 202.96,
+        "max": 379.58
+      },
+      "cache_hit_rate": 0.0,
+      "abstention_rate": 0.2838,
+      "server_side_ms": {
+        "p50": 130.09,
+        "p95": 190.04,
+        "p99": 209.19,
+        "mean": 121.84,
+        "max": 220.26
+      }
+    },
+    {
+      "concurrency": 32,
+      "requests": 800,
+      "seconds": 11.12,
+      "throughput_rps": 71.94,
+      "statuses": {
+        "200": 800
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 441.06,
+        "p95": 662.43,
+        "p99": 721.76,
+        "mean": 438.2,
+        "max": 820.14
+      },
+      "cache_hit_rate": 0.0,
+      "abstention_rate": 0.2838,
+      "server_side_ms": {
+        "p50": 287.5,
+        "p95": 415.35,
+        "p99": 475.97,
+        "mean": 269.87,
+        "max": 516.38
+      }
+    }
+  ],
+  "stream": [
+    {
+      "concurrency": 1,
+      "requests": 200,
+      "seconds": 4.695,
+      "throughput_rps": 42.6,
+      "statuses": {
+        "200": 200
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 27.2,
+        "p95": 35.01,
+        "p99": 47.36,
+        "mean": 23.47,
+        "max": 50.95
+      },
+      "time_to_first_token_ms": {
+        "p50": 23.31,
+        "p95": 28.65,
+        "p99": 36.1,
+        "mean": 18.57,
+        "max": 45.82
+      },
+      "time_to_first_event_ms": {
+        "p50": 23.59,
+        "p95": 30.02,
+        "p99": 41.4,
+        "mean": 19.87,
+        "max": 45.32
+      },
+      "streams_with_tokens": 143
+    },
+    {
+      "concurrency": 4,
+      "requests": 200,
+      "seconds": 2.92,
+      "throughput_rps": 68.5,
+      "statuses": {
+        "200": 200
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 64.09,
+        "p95": 91.7,
+        "p99": 96.84,
+        "mean": 58.2,
+        "max": 99.78
+      },
+      "time_to_first_token_ms": {
+        "p50": 49.38,
+        "p95": 78.87,
+        "p99": 86.24,
+        "mean": 47.0,
+        "max": 89.75
+      },
+      "time_to_first_event_ms": {
+        "p50": 53.92,
+        "p95": 79.11,
+        "p99": 83.89,
+        "mean": 48.35,
+        "max": 86.12
+      },
+      "streams_with_tokens": 143
+    },
+    {
+      "concurrency": 16,
+      "requests": 200,
+      "seconds": 3.307,
+      "throughput_rps": 60.48,
+      "statuses": {
+        "200": 200
+      },
+      "error_rate": 0.0,
+      "latency_ms": {
+        "p50": 254.38,
+        "p95": 371.54,
+        "p99": 424.26,
+        "mean": 260.13,
+        "max": 425.71
+      },
+      "time_to_first_token_ms": {
+        "p50": 206.64,
+        "p95": 301.68,
+        "p99": 331.41,
+        "mean": 210.43,
+        "max": 361.34
+      },
+      "time_to_first_event_ms": {
+        "p50": 193.4,
+        "p95": 282.17,
+        "p99": 328.04,
+        "mean": 194.68,
+        "max": 357.31
+      },
+      "streams_with_tokens": 143
+    }
+  ]
+}
