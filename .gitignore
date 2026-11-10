@@ -1,0 +1,44 @@
+# --- restricted / generated data: never commit medical data ---
+data/*
+!data/README.md
+!data/synthetic/
+data/synthetic/*
+!data/synthetic/.gitkeep
+artifacts/
+*.dcm
+*.nii
+*.nii.gz
+*.npy
+*.npz
+*.parquet
+
+# --- credentials and local state ---
+.env
+.env.*
+!.env.example
+*.sqlite
+*.db
+mlruns/
+
+# --- models and caches ---
+models/
+.cache/
+hf_cache/
+
+# --- python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- node ---
+node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
+
+.DS_Store

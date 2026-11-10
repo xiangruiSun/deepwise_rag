@@ -1,0 +1,57 @@
+# Stage 4 — multimodal ablation (spec section 26).
+# "Structured EHR" = laboratory similarity + diagnosis-code similarity.
+# Image similarity is an experimental representation score. If it does not help, it must not be
+# forced into the final architecture.
+# The text embedding below is the dependency-free hashing baseline so this suite runs CPU-only;
+# replace it with the embedding selected in stage 1 for real evaluations.
+suite_id: multimodal_ablation
+description: Contribution of text, structured EHR and image modalities.
+base_config: synthetic.yaml
+stage: validation
+baseline_experiment: M01
+recipes:
+  m_text:
+    recipe_id: m_text
+    branches: [bm25, dense]
+    embedding: hashing
+  m_ehr:
+    recipe_id: m_ehr
+    branches: []
+    multimodal: {enabled: true, modalities: [laboratory, diagnosis], candidate_sources: [laboratory, diagnosis], family: rank}
+  m_image:
+    recipe_id: m_image
+    branches: []
+    multimodal: {enabled: true, modalities: [image], candidate_sources: [image], family: rank}
+  m_text_ehr:
+    recipe_id: m_text_ehr
+    branches: [bm25, dense]
+    embedding: hashing
+    multimodal: {enabled: true, modalities: [text, laboratory, diagnosis], candidate_sources: [text], family: rank}
+  m_text_image:
+    recipe_id: m_text_image
+    branches: [bm25, dense]
+    embedding: hashing
+    multimodal: {enabled: true, modalities: [text, image], candidate_sources: [text], family: rank}
+  m_ehr_image:
+    recipe_id: m_ehr_image
+    branches: []
+    multimodal: {enabled: true, modalities: [laboratory, diagnosis, image], candidate_sources: [laboratory, image], family: rank}
+  m_all:
+    recipe_id: m_all
+    branches: [bm25, dense]
+    embedding: hashing
+    multimodal: {enabled: true, modalities: [text, laboratory, diagnosis, image], candidate_sources: [text], family: rank}
+  m_all_score:
+    recipe_id: m_all_score
+    branches: [bm25, dense]
+    embedding: hashing
+    multimodal: {enabled: true, modalities: [text, laboratory, diagnosis, image], candidate_sources: [text], family: score}
+runs:
+  - {experiment_id: M01, recipe: m_text, description: Text only}
+  - {experiment_id: M02, recipe: m_ehr, description: Structured EHR only}
+  - {experiment_id: M03, recipe: m_image, description: Image only}
+  - {experiment_id: M04, recipe: m_text_ehr, description: Text + structured EHR}
+  - {experiment_id: M05, recipe: m_text_image, description: Text + image}
+  - {experiment_id: M06, recipe: m_ehr_image, description: Structured EHR + image}
+  - {experiment_id: M07, recipe: m_all, description: Text + structured EHR + image (rank fusion)}
+  - {experiment_id: M08, recipe: m_all_score, description: Text + structured EHR + image (score fusion)}

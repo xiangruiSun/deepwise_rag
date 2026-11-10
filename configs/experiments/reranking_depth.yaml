@@ -1,0 +1,22 @@
+# Reranking depth 20 / 40 / 80 for both cross-encoders (spec section 16).
+suite_id: reranking_depth
+description: Reranking depth versus quality and latency.
+base_config: synthetic.yaml
+stage: validation
+baseline_experiment: D00
+recipes:
+  d_rrf: {recipe_id: d_rrf, branches: [bm25, dense], embedding: minilm, fused_top_k: 100}
+  d_general_20: {recipe_id: d_general_20, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: ms_marco_minilm, provider: cross_encoder, model_id: cross-encoder/ms-marco-MiniLM-L6-v2, depth: 20}}
+  d_general_40: {recipe_id: d_general_40, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: ms_marco_minilm, provider: cross_encoder, model_id: cross-encoder/ms-marco-MiniLM-L6-v2, depth: 40}}
+  d_general_80: {recipe_id: d_general_80, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: ms_marco_minilm, provider: cross_encoder, model_id: cross-encoder/ms-marco-MiniLM-L6-v2, depth: 80}}
+  d_medcpt_20: {recipe_id: d_medcpt_20, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: medcpt_cross_encoder, provider: medcpt_cross_encoder, model_id: ncbi/MedCPT-Cross-Encoder, depth: 20}}
+  d_medcpt_40: {recipe_id: d_medcpt_40, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: medcpt_cross_encoder, provider: medcpt_cross_encoder, model_id: ncbi/MedCPT-Cross-Encoder, depth: 40}}
+  d_medcpt_80: {recipe_id: d_medcpt_80, branches: [bm25, dense], embedding: minilm, fused_top_k: 100, reranker: {enabled: true, key: medcpt_cross_encoder, provider: medcpt_cross_encoder, model_id: ncbi/MedCPT-Cross-Encoder, depth: 80}}
+runs:
+  - {experiment_id: D00, recipe: d_rrf, description: RRF without reranking}
+  - {experiment_id: D01, recipe: d_general_20, description: General cross-encoder depth 20}
+  - {experiment_id: D02, recipe: d_general_40, description: General cross-encoder depth 40}
+  - {experiment_id: D03, recipe: d_general_80, description: General cross-encoder depth 80}
+  - {experiment_id: D04, recipe: d_medcpt_20, description: MedCPT cross-encoder depth 20}
+  - {experiment_id: D05, recipe: d_medcpt_40, description: MedCPT cross-encoder depth 40}
+  - {experiment_id: D06, recipe: d_medcpt_80, description: MedCPT cross-encoder depth 80}

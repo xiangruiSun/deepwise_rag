@@ -1,0 +1,32 @@
+# CPU-only smoke suite on synthetic data (no model download, no LLM).
+# Verifies that the whole evaluation path works. NOT evidence of clinical performance.
+suite_id: smoke
+description: Dependency-free pipeline verification on the synthetic cohort.
+base_config: synthetic.yaml
+stage: validation
+baseline_experiment: S01
+recipes:
+  hybrid_weighted_hashing:
+    recipe_id: hybrid_weighted_hashing
+    branches: [bm25, dense]
+    embedding: hashing
+    fusion: {method: weighted_score, weights: {bm25: 0.5, dense: 0.5}, normalization: min_max}
+  hybrid_rrf_overlap_rerank:
+    recipe_id: hybrid_rrf_overlap_rerank
+    branches: [bm25, dense]
+    embedding: hashing
+    fusion: {method: rrf, rrf_k: 60}
+    reranker: {enabled: true, key: lexical_overlap, provider: lexical_overlap, depth: 40}
+generation_variants:
+  extractive:
+    key: extractive
+    backend: extractive
+    model: extractive-evidence-v1
+    post_verification: true
+runs:
+  - {experiment_id: S01, recipe: bm25, description: BM25 baseline}
+  - {experiment_id: S02, recipe: dense_hashing, description: Dense (hashing embedding)}
+  - {experiment_id: S03, recipe: hybrid_rrf_hashing, description: BM25 + dense with RRF, generation: extractive}
+  - {experiment_id: S04, recipe: hybrid_weighted_hashing, description: BM25 + dense with weighted score fusion}
+  - {experiment_id: S05, recipe: hybrid_rrf_overlap_rerank, description: RRF + lexical-overlap reranker}
+  - {experiment_id: S06, recipe: multimodal_hashing, description: Hybrid + laboratory + image + diagnosis fusion}

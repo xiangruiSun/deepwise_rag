@@ -1,0 +1,25 @@
+# Stage 2 — chunking comparison (spec section 24).
+# The embedding is fixed. Replace `minilm` with the embedding selected in stage 1.
+# INSPECT impressions are short: whole-impression indexing is an explicit baseline, and short
+# impressions are never split, so several strategies may produce identical indexes.
+suite_id: chunking_comparison
+description: Chunking strategies with a fixed embedding and a fixed dense retriever.
+base_config: synthetic.yaml
+stage: validation
+baseline_experiment: C01
+recipes:
+  chunk_whole_impression: {recipe_id: chunk_whole_impression, branches: [dense], embedding: minilm, chunking: whole_impression}
+  chunk_fixed_128: {recipe_id: chunk_fixed_128, branches: [dense], embedding: minilm, chunking: fixed_128}
+  chunk_fixed_256: {recipe_id: chunk_fixed_256, branches: [dense], embedding: minilm, chunking: fixed_256}
+  chunk_fixed_256_o32: {recipe_id: chunk_fixed_256_o32, branches: [dense], embedding: minilm, chunking: fixed_256_o32}
+  chunk_fixed_512_o64: {recipe_id: chunk_fixed_512_o64, branches: [dense], embedding: minilm, chunking: fixed_512_o64}
+  chunk_sentence: {recipe_id: chunk_sentence, branches: [dense], embedding: minilm, chunking: sentence}
+  chunk_parent_child: {recipe_id: chunk_parent_child, branches: [dense], embedding: minilm, chunking: parent_child}
+runs:
+  - {experiment_id: C01, recipe: chunk_whole_impression, description: "Whole impression"}
+  - {experiment_id: C02, recipe: chunk_fixed_128, description: "Fixed 128 tokens, zero overlap"}
+  - {experiment_id: C03, recipe: chunk_fixed_256, description: "Fixed 256 tokens, zero overlap"}
+  - {experiment_id: C04, recipe: chunk_fixed_256_o32, description: "Fixed 256 tokens, 32-token overlap"}
+  - {experiment_id: C05, recipe: chunk_fixed_512_o64, description: "Fixed 512 tokens, 64-token overlap"}
+  - {experiment_id: C06, recipe: chunk_sentence, description: "Sentence-aware"}
+  - {experiment_id: C07, recipe: chunk_parent_child, description: "Parent-child retrieval"}

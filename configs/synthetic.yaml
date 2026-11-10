@@ -1,0 +1,164 @@
+# Synthetic-data configuration (pipeline verification only — NOT clinical evidence).
+# Everything here is configuration: no model, retriever, fusion weight, reranker or LLM
+# is hardcoded in application code.
+
+dataset:
+  name: synthetic
+  adapter: synthetic
+  release: synthetic-1.0
+  root: data/synthetic
+  batch_size: 2000
+  lookback_days: [7, 30, 90]
+  default_lookback_days: 30
+  corpus_split: train
+  dev_query_split: valid
+  test_query_split: test
+
+embeddings:
+  # Dependency-free lexical-hashing baseline for CPU-only smoke runs and CI.
+  # It is NOT one of the four compared embedding models.
+  hashing:
+    key: hashing
+    provider: hashing
+    model_id: hashing-ngram-v1
+    dimension: 384
+    pooling: hashing
+    max_document_tokens: 512
+    max_query_tokens: 512
+  minilm:
+    key: minilm
+    provider: sentence_transformers
+    model_id: sentence-transformers/all-MiniLM-L6-v2
+    revision: null            # resolved commit is recorded in every run; pin it with scripts/pin_model_revisions.py
+    dimension: 384
+    pooling: mean
+    normalize: true
+    max_document_tokens: 256
+    max_query_tokens: 256
+  e5:
+    key: e5
+    provider: sentence_transformers
+    model_id: intfloat/e5-base-v2
+    revision: null
+    dimension: 768
+    pooling: mean
+    normalize: true
+    query_prefix: "query: "
+    document_prefix: "passage: "
+    max_document_tokens: 512
+    max_query_tokens: 512
+  bge:
+    key: bge
+    provider: sentence_transformers
+    model_id: BAAI/bge-base-en-v1.5
+    revision: null
+    dimension: 768
+    pooling: cls
+    normalize: true
+    query_prefix: "Represent this sentence for searching relevant passages: "
+    document_prefix: ""
+    max_document_tokens: 512
+    max_query_tokens: 512
+  medcpt:
+    key: medcpt
+    provider: medcpt
+    model_id: ncbi/MedCPT-Article-Encoder
+    query_model_id: ncbi/MedCPT-Query-Encoder
+    revision: null
+    query_revision: null
+    dimension: 768
+    pooling: cls
+    normalize: false          # official MedCPT scoring: inner product of raw CLS vectors
+    similarity: max_inner_product
+    max_document_tokens: 512
+    max_query_tokens: 64
+
+chunking:
+  whole_impression: {key: whole_impression, strategy: whole_impression, max_tokens: 512}
+  fixed_128: {key: fixed_128, strategy: fixed, max_tokens: 128, overlap: 0}
+  fixed_256: {key: fixed_256, strategy: fixed, max_tokens: 256, overlap: 0}
+  fixed_256_o32: {key: fixed_256_o32, strategy: sliding_window, max_tokens: 256, overlap: 32}
+  fixed_512_o64: {key: fixed_512_o64, strategy: sliding_window, max_tokens: 512, overlap: 64}
+  sentence: {key: sentence, strategy: sentence, max_tokens: 64}
+  structure: {key: structure, strategy: structure, max_tokens: 128}
+  parent_child: {key: parent_child, strategy: parent_child, max_tokens: 24}
+
+index:
+  mapping_version: v1
+  cases_index: cases_v1
+  report_index_prefix: report_chunks_v1
+  image_index: image_features_v1
+  alias_prefix: inspect_rag
+  knn_num_candidates: 200
+  refresh: wait_for
+
+image:
+  provider: intensity_histogram
+  dimension: 64
+  version: img-v1
+  target_spacing_mm: [2.5, 2.4, 2.4]
+  hu_window: [-1000.0, 900.0]
+
+# Indexes built by `make index-baseline` (CPU-only; no model download needed).
+index_embeddings: [hashing]
+index_chunkings: [whole_impression]
+
+default_recipe: bm25
+
+recipes:
+  bm25:
+    recipe_id: bm25
+    description: Lexical baseline (BM25 over whole impressions, best-score case aggregation).
+    branches: [bm25]
+    bm25_top_k: 50
+  dense_hashing:
+    recipe_id: dense_hashing
+    description: Dense kNN with the dependency-free hashing embedding (smoke baseline).
+    branches: [dense]
+    embedding: hashing
+    dense_top_k: 50
+    dense_num_candidates: 200
+  hybrid_rrf_hashing:
+    recipe_id: hybrid_rrf_hashing
+    description: BM25 + hashing-dense fused at document level with RRF (k=60, weights 1).
+    branches: [bm25, dense]
+    embedding: hashing
+    fusion: {method: rrf, rrf_k: 60, weights: {bm25: 1.0, dense: 1.0}}
+  multimodal_hashing:
+    recipe_id: multimodal_hashing
+    description: Hybrid text + laboratory + image + diagnosis-code fusion (weighted RRF).
+    branches: [bm25, dense]
+    embedding: hashing
+    fusion: {method: rrf, rrf_k: 60}
+    multimodal:
+      enabled: true
+      modalities: [text, laboratory, image, diagnosis]
+      candidate_sources: [text]
+      family: rank
+      weights: {text: 0.45, laboratory: 0.25, image: 0.20, diagnosis: 0.10}
+      missing_policy: renormalize
+      laboratory: {lookback_days: 30, aggregate: last, min_overlap: 2}
+
+generation:
+  key: extractive
+  backend: extractive
+  model: extractive-evidence-v1
+  prompt_variant: structured_citations
+  post_verification: true
+  max_cases: 5
+  max_evidence_per_case: 8
+  context_token_budget: 3000
+
+evaluation:
+  query_set: data/synthetic/eval/queries.jsonl
+  qrels: data/synthetic/eval/qrels.jsonl
+  generation_set: data/synthetic/eval/generation_eval.jsonl
+  k_values: [5, 10, 20]
+  relevance_threshold: 2
+  unjudged_policy: non_relevant
+  label_sources: [synthetic_rubric]
+  seed: 13
+  bootstrap_samples: 2000
+  warmup_queries: 2
+  concurrency: 1
+  top_k: 20

@@ -1,0 +1,57 @@
+# Baseline configuration for AUTHORIZED Stanford INSPECT data.
+#
+# Nothing in this file downloads data. Obtain INSPECT through the official channels
+# (docs/dataset.md), place it under `dataset.root` (git-ignored) and then:
+#   1. python -m app.cli inspect-dataset data/inspect      # see the real files and columns
+#   2. set `dataset.files` / `dataset.columns` below to what the inspector reports
+#   3. python -m app.cli validate-dataset -c baseline.yaml  # fails loudly on any unresolved field
+#
+# The file names and column names below are the ones described in the INSPECT paper / public
+# loader code and have NOT been verified against the access-controlled release.
+extends: synthetic.yaml
+
+dataset:
+  name: inspect
+  adapter: inspect_legacy          # or inspect_meds for a MEDS/Parquet release
+  release: null                    # set to the release identifier you downloaded
+  root: data/inspect
+  files:
+    cohort: cohort_0.2.0_master_file_anon.csv
+    impressions: Final_Impressions.csv
+    ehr_dir: ehr
+    imaging_dir: CTPA
+  columns: {}                      # e.g. {cohort: {patient_id: person_id, procedure_time: procedure_DATETIME}}
+  code_prefixes: {}                # e.g. {gender: "Gender/", race: "Race/", ethnicity: "Ethnicity/", birth: "SNOMED/3950001"}
+  default_access_scope: research
+  batch_size: 20000
+  lookback_days: [7, 30, 90]
+  default_lookback_days: 30
+
+# Imaging stays disabled until a compatible, verified 3-D CT representation is configured
+# (precomputed features or an exported encoder). See docs/architecture.md, "Imaging".
+image:
+  provider: disabled
+
+index_embeddings: [minilm]
+index_chunkings: [whole_impression]
+default_recipe: bm25
+
+recipes:
+  dense_minilm:
+    recipe_id: dense_minilm
+    description: Dense kNN with all-MiniLM-L6-v2 over whole impressions.
+    branches: [dense]
+    embedding: minilm
+  hybrid_rrf_minilm:
+    recipe_id: hybrid_rrf_minilm
+    description: BM25 + MiniLM fused at document level with RRF (k=60).
+    branches: [bm25, dense]
+    embedding: minilm
+    fusion: {method: rrf, rrf_k: 60, weights: {bm25: 1.0, dense: 1.0}}
+
+evaluation:
+  # Created by the blinded annotation workflow (docs/evaluation.md). Clinician-reviewed labels only.
+  query_set: data/inspect_eval/queries.jsonl
+  qrels: data/inspect_eval/qrels.jsonl
+  generation_set: data/inspect_eval/generation_eval.jsonl
+  label_sources: [clinician]

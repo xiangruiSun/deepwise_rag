@@ -1,0 +1,91 @@
+# Local, reproducible deployment. Research prototype — not for clinical use.
+#   docker compose up -d                      # postgres, elasticsearch, backend, frontend
+#   docker compose --profile llm up -d        # + local Ollama server
+#   docker compose --profile tracking up -d   # + MLflow tracking server
+# Ports are bound to 127.0.0.1 only. Elasticsearch security is disabled for LOCAL development;
+# enable TLS and authentication before exposing it to any network.
+name: inspect-rag
+
+services:
+  postgres:
+    image: postgres:16.4
+    environment:
+      POSTGRES_DB: inspect_rag
+      POSTGRES_USER: inspect_rag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inspect_rag -d inspect_rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    ports: ["127.0.0.1:9200:9200"]
+    volumes: [esdata:/usr/share/elasticsearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      INSPECT_RAG_ENVIRONMENT: ${INSPECT_RAG_ENVIRONMENT:-development}
+      INSPECT_RAG_APP_CONFIG: ${INSPECT_RAG_APP_CONFIG:-synthetic.yaml}
+      INSPECT_RAG_DATABASE_URL: postgresql+psycopg://inspect_rag:${POSTGRES_PASSWORD}@postgres:5432/inspect_rag
+      INSPECT_RAG_SEARCH_BACKEND: elasticsearch
+      INSPECT_RAG_ELASTICSEARCH_URL: http://elasticsearch:9200
+      INSPECT_RAG_ARTIFACT_DIR: /srv/artifacts
+      INSPECT_RAG_API_KEYS_JSON: ${INSPECT_RAG_API_KEYS_JSON:-}
+      INSPECT_RAG_DEV_API_KEY: ${INSPECT_RAG_DEV_API_KEY:-dev-research-key}
+      INSPECT_RAG_CORS_ORIGINS: http://localhost:8080
+      INSPECT_RAG_MLFLOW_TRACKING_URI: ${INSPECT_RAG_MLFLOW_TRACKING_URI:-}
+    volumes:
+      - ./configs:/srv/configs:ro
+      - ./data:/srv/data            # synthetic fixtures are generated here; mount INSPECT read-only yourself
+      - artifacts:/srv/artifacts
+    depends_on:
+      postgres: {condition: service_healthy}
+      elasticsearch: {condition: service_healthy}
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on: [backend]
+    ports: ["127.0.0.1:8080:80"]
+
+  ollama:
+    profiles: ["llm"]
+    image: ollama/ollama:0.3.12
+    ports: ["127.0.0.1:11434:11434"]
+    volumes: [ollama:/root/.ollama]
+
+  mlflow:
+    profiles: ["tracking"]
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --artifacts-destination /mlflow/artifacts
+    ports: ["127.0.0.1:5000:5000"]
+    volumes: [mlflow:/mlflow]
+
+volumes:
+  pgdata:
+  esdata:
+  artifacts:
+  ollama:
+  mlflow:

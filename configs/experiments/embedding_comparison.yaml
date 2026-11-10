@@ -1,0 +1,19 @@
+# Stage 1 — embedding model comparison (spec section 23).
+# Held constant: corpus, queries, whole-impression chunking, kNN depth, filters, labels, top-K, NO reranking.
+# Requires backend/requirements-ml.txt (PyTorch + SentenceTransformers) and the model weights.
+suite_id: embedding_comparison
+description: BM25 versus four dense embedding configurations, no reranking.
+base_config: synthetic.yaml          # use baseline.yaml for authorized INSPECT data
+stage: validation
+baseline_experiment: E01
+recipes:
+  dense_minilm: {recipe_id: dense_minilm, branches: [dense], embedding: minilm, dense_top_k: 50, dense_num_candidates: 200}
+  dense_e5: {recipe_id: dense_e5, branches: [dense], embedding: e5, dense_top_k: 50, dense_num_candidates: 200}
+  dense_bge: {recipe_id: dense_bge, branches: [dense], embedding: bge, dense_top_k: 50, dense_num_candidates: 200}
+  dense_medcpt: {recipe_id: dense_medcpt, branches: [dense], embedding: medcpt, dense_top_k: 50, dense_num_candidates: 200}
+runs:
+  - {experiment_id: E01, recipe: bm25, description: BM25 (no embedding)}
+  - {experiment_id: E02, recipe: dense_minilm, description: Dense MiniLM}
+  - {experiment_id: E03, recipe: dense_e5, description: Dense E5-base-v2}
+  - {experiment_id: E04, recipe: dense_bge, description: Dense BGE-base-v1.5}
+  - {experiment_id: E05, recipe: dense_medcpt, description: Dense MedCPT (query + article encoders)}

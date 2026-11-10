@@ -1,0 +1,77 @@
+# Stage 3 — retrieval strategy comparison (spec section 25), sequential ablation.
+# The embedding is fixed (replace `minilm` with the stage-1 selection). R10-R12 add query
+# transformations to the best earlier configuration: set their base recipe after R01-R09 are
+# evaluated on validation data. R10 and R12 need a local LLM (generation.backend) and are
+# reported as "skipped" without one.
+suite_id: retrieval_comparison
+description: Lexical, dense, fused, reranked and multimodal retrieval strategies.
+base_config: synthetic.yaml
+stage: validation
+baseline_experiment: R01
+recipes:
+  r_dense: {recipe_id: r_dense, branches: [dense], embedding: minilm}
+  r_rrf:
+    recipe_id: r_rrf
+    branches: [bm25, dense]
+    embedding: minilm
+    fusion: {method: rrf, rrf_k: 60, weights: {bm25: 1.0, dense: 1.0}}
+  r_weighted:
+    recipe_id: r_weighted
+    branches: [bm25, dense]
+    embedding: minilm
+    fusion: {method: weighted_score, weights: {bm25: 0.5, dense: 0.5}, normalization: min_max}
+  r_rrf_ce_general:
+    recipe_id: r_rrf_ce_general
+    branches: [bm25, dense]
+    embedding: minilm
+    fused_top_k: 100
+    reranker: {enabled: true, key: ms_marco_minilm, provider: cross_encoder, model_id: cross-encoder/ms-marco-MiniLM-L6-v2, depth: 40}
+  r_rrf_ce_medcpt:
+    recipe_id: r_rrf_ce_medcpt
+    branches: [bm25, dense]
+    embedding: minilm
+    fused_top_k: 100
+    reranker: {enabled: true, key: medcpt_cross_encoder, provider: medcpt_cross_encoder, model_id: ncbi/MedCPT-Cross-Encoder, depth: 40}
+  r_hybrid_lab:
+    recipe_id: r_hybrid_lab
+    branches: [bm25, dense]
+    embedding: minilm
+    multimodal: {enabled: true, modalities: [text, laboratory], candidate_sources: [text], family: rank}
+  r_hybrid_image:
+    recipe_id: r_hybrid_image
+    branches: [bm25, dense]
+    embedding: minilm
+    multimodal: {enabled: true, modalities: [text, image], candidate_sources: [text], family: rank}
+  r_hybrid_lab_image:
+    recipe_id: r_hybrid_lab_image
+    branches: [bm25, dense]
+    embedding: minilm
+    multimodal: {enabled: true, modalities: [text, laboratory, image], candidate_sources: [text], family: rank}
+  r_best_rewrite:
+    recipe_id: r_best_rewrite
+    branches: [bm25, dense]
+    embedding: minilm
+    query_enhancement: {method: llm_rewrite}
+  r_best_expansion:
+    recipe_id: r_best_expansion
+    branches: [bm25, dense]
+    embedding: minilm
+    query_enhancement: {method: rule_expansion}
+  r_best_hyde:
+    recipe_id: r_best_hyde
+    branches: [bm25, dense]
+    embedding: minilm
+    query_enhancement: {method: hyde}
+runs:
+  - {experiment_id: R01, recipe: bm25, description: BM25}
+  - {experiment_id: R02, recipe: r_dense, description: Dense vectors}
+  - {experiment_id: R03, recipe: r_rrf, description: BM25 + dense with RRF}
+  - {experiment_id: R04, recipe: r_weighted, description: BM25 + dense with normalized weighted fusion}
+  - {experiment_id: R05, recipe: r_rrf_ce_general, description: RRF + general cross-encoder}
+  - {experiment_id: R06, recipe: r_rrf_ce_medcpt, description: RRF + MedCPT cross-encoder}
+  - {experiment_id: R07, recipe: r_hybrid_lab, description: Hybrid + laboratory reranking}
+  - {experiment_id: R08, recipe: r_hybrid_image, description: Hybrid + image similarity}
+  - {experiment_id: R09, recipe: r_hybrid_lab_image, description: Hybrid + laboratory + image fusion}
+  - {experiment_id: R10, recipe: r_best_rewrite, description: Best earlier configuration + LLM query rewriting}
+  - {experiment_id: R11, recipe: r_best_expansion, description: Best earlier configuration + rule-based query expansion}
+  - {experiment_id: R12, recipe: r_best_hyde, description: Best earlier configuration + HyDE}
