@@ -1,0 +1,211 @@
+{
+  "policy": {
+    "primary_metric": "ndcg@10",
+    "selection_data": "validation",
+    "safety_gates": [
+      "authorization_isolation",
+      "split_isolation",
+      "temporal_cutoff",
+      "citation_validity",
+      "reproducible_execution"
+    ],
+    "max_latency_ratio": 5.0,
+    "min_faithfulness": null,
+    "bootstrap_samples": 2000,
+    "seed": 13
+  },
+  "baseline": "R01",
+  "selected": "R01",
+  "rationale": "no configuration showed a credible improvement; simpler baseline kept",
+  "decisions": [
+    {
+      "experiment_id": "R01",
+      "primary_metric": 0.6048900374317382,
+      "status": "baseline"
+    },
+    {
+      "experiment_id": "R02",
+      "primary_metric": 0.594553502037522,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.594553502037522,
+        "mean_difference": -0.010336535394216195,
+        "ci_low": -0.06916945966341498,
+        "ci_high": 0.05003059869268178,
+        "p_not_better": 0.6125,
+        "wins": 13,
+        "losses": 14,
+        "ties": 3,
+        "top_decile_share": 0.5307461158166749
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R03",
+      "primary_metric": 0.6090937629777209,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.6090937629777209,
+        "mean_difference": 0.004203725545982747,
+        "ci_low": -0.02597959281681541,
+        "ci_high": 0.03385024381575736,
+        "p_not_better": 0.393,
+        "wins": 15,
+        "losses": 11,
+        "ties": 4,
+        "top_decile_share": 0.5085984052270441
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R04",
+      "primary_metric": 0.610219007123329,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.610219007123329,
+        "mean_difference": 0.005328969691590931,
+        "ci_low": -0.02682956250737528,
+        "ci_high": 0.041562990479742885,
+        "p_not_better": 0.3965,
+        "wins": 14,
+        "losses": 13,
+        "ties": 3,
+        "top_decile_share": 0.5534527274137034
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R05",
+      "primary_metric": 0.6003492053290124,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.6003492053290124,
+        "mean_difference": -0.004540832102725839,
+        "ci_low": -0.08086221866059368,
+        "ci_high": 0.07643632534670596,
+        "p_not_better": 0.5545,
+        "wins": 14,
+        "losses": 16,
+        "ties": 0,
+        "top_decile_share": 0.4684892771193135
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R06",
+      "primary_metric": 0.5995180319241434,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.5995180319241434,
+        "mean_difference": -0.005372005507594803,
+        "ci_low": -0.06887925478727203,
+        "ci_high": 0.06120318385119074,
+        "p_not_better": 0.567,
+        "wins": 14,
+        "losses": 15,
+        "ties": 1,
+        "top_decile_share": 0.5650031741812421
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R07",
+      "primary_metric": 0.5789924639222781,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.5789924639222781,
+        "mean_difference": -0.025897573509460134,
+        "ci_low": -0.06730421051072213,
+        "ci_high": 0.014694570993787768,
+        "p_not_better": 0.8875,
+        "wins": 17,
+        "losses": 13,
+        "ties": 0,
+        "top_decile_share": 0.41210318357491027
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R08",
+      "primary_metric": 0.5951836136269527,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.5951836136269527,
+        "mean_difference": -0.009706423804785431,
+        "ci_low": -0.053091129676240335,
+        "ci_high": 0.0342162540311934,
+        "p_not_better": 0.656,
+        "wins": 16,
+        "losses": 12,
+        "ties": 2,
+        "top_decile_share": 0.4589011864276512
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R09",
+      "primary_metric": 0.5851786116298066,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.5851786116298066,
+        "mean_difference": -0.01971142580193177,
+        "ci_low": -0.06835829221029922,
+        "ci_high": 0.028859903832312694,
+        "p_not_better": 0.776,
+        "wins": 17,
+        "losses": 13,
+        "ties": 0,
+        "top_decile_share": 0.3948224731912754
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R11",
+      "primary_metric": 0.6255051337319835,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 30,
+        "mean_baseline": 0.6048900374317382,
+        "mean_candidate": 0.6255051337319835,
+        "mean_difference": 0.02061509630024517,
+        "ci_low": -0.022401173775580183,
+        "ci_high": 0.059886574794627015,
+        "p_not_better": 0.1635,
+        "wins": 16,
+        "losses": 10,
+        "ties": 4,
+        "top_decile_share": 0.5018935329801926
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    }
+  ],
+  "suite_id": "retrieval_comparison",
+  "data_kind": "synthetic",
+  "dataset_fingerprint": "519f8e9069a09160aa92f93107209118c1ee3aed1c0e3d28e8e5e6d6f2bc23bc",
+  "selected_recipe": "bm25"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "experiment_id": "R01",
+    "run_id": "R01-e7f841647ed2",
+    "evaluation_status": "completed",
+    "stage": "test",
+    "data_kind": "synthetic",
+    "embedding_model": null,
+    "retrieval_method": "bm25",
+    "fusion_strategy": null,
+    "reranker": null,
+    "chunking": "whole_impression",
+    "modality_combination": "text",
+    "recall@10": 0.47061586955203977,
+    "precision@10": 0.3407407407407408,
+    "ndcg@10": 0.5578452175260217,
+    "judged_coverage@10": 0.8296296296296297,
+    "p50_latency_ms": 4.778499999999999,
+    "p95_retrieval_latency_ms": 1.8892499999999997,
+    "faithfulness": null,
+    "citation_coverage": null,
+    "index_size_bytes": 188933,
+    "gates_passed": true,
+    "error": null
+  }
+]
