@@ -22,6 +22,9 @@ from app.indexing.mappings import (
     raw_similarity,
 )
 
+MAX_RESULT_WINDOW = 10_000  # Elasticsearch default for index.max_result_window
+SEARCH_AFTER_PAGE = 5_000
+
 
 class ElasticsearchBackend:
     name = "elasticsearch"
@@ -151,11 +154,38 @@ class ElasticsearchBackend:
 
     def filter_search(self, name: str, filters: FilterSpec | None, size: int, offset: int = 0,
                       sort_field: str = "case_id") -> tuple[list[Hit], int]:
-        response = self.client.search(
-            index=name, query=build_filter_clauses(filters), size=size, from_=offset,
-            sort=[{sort_field: "asc"}], track_total_hits=True, source_excludes=[VECTOR_FIELD],
-        )
-        return self._hits(response), int(response["hits"]["total"]["value"])
+        query = build_filter_clauses(filters)
+        sort = [{sort_field: "asc"}, {"_doc": "asc"}]
+        if offset + size <= MAX_RESULT_WINDOW:
+            response = self.client.search(
+                index=name, query=query, size=size, from_=offset, sort=sort, track_total_hits=True,
+                source_excludes=[VECTOR_FIELD],
+            )
+            return self._hits(response), int(response["hits"]["total"]["value"])
+        # Deep pages: from+size may not exceed index.max_result_window, so walk the sorted
+        # result set with search_after instead.
+        hits: list[Hit] = []
+        total = 0
+        skipped = 0
+        after: list[Any] | None = None
+        while len(hits) < size:
+            kwargs: dict[str, Any] = {"search_after": after} if after is not None else {}
+            response = self.client.search(
+                index=name, query=query, size=SEARCH_AFTER_PAGE, sort=sort, track_total_hits=True,
+                source_excludes=[VECTOR_FIELD], **kwargs,
+            )
+            total = int(response["hits"]["total"]["value"])
+            page = response["hits"]["hits"]
+            if not page:
+                break
+            after = page[-1]["sort"]
+            for raw, hit in zip(page, self._hits(response), strict=True):
+                del raw
+                if skipped < offset:
+                    skipped += 1
+                elif len(hits) < size:
+                    hits.append(hit)
+        return hits, total
 
     # ----------------------------------------------------------------- aliases
     def put_alias(self, alias: str, index: str) -> None:

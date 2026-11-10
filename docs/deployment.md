@@ -26,16 +26,35 @@ docker compose --profile llm up -d        # optional Ollama
 docker compose --profile tracking up -d   # optional MLflow
 ```
 
-**Not verified in this repository's development environment:** the Compose stack, the Docker images
-and the live Elasticsearch/PostgreSQL path were written and reviewed but could not be run there (no
-Docker daemon). The Elasticsearch query DSL is unit-tested and
-`backend/tests/integration/test_elasticsearch_live.py` runs automatically when a node is reachable:
+The stack was run end to end on synthetic data (Docker Desktop 4.99, Elasticsearch 8.15.3,
+PostgreSQL 16.4): images build, the backend applies the Alembic migration on start, ingestion,
+indexing and the baseline suite run inside the container, and the UI and API work through the nginx
+frontend on port 8080. The published image tags for the optional `llm` and `tracking` profiles were
+not started.
+
+### Testing against live services
+
+The test suite is hermetic by default. To run every test context on real services instead:
 
 ```bash
-INSPECT_RAG_ELASTICSEARCH_URL=http://localhost:9200 make test
+cd backend
+INSPECT_RAG_TEST_ELASTICSEARCH_URL=http://127.0.0.1:9200 \
+INSPECT_RAG_TEST_DATABASE_URL=postgresql+psycopg://inspect_rag:<password>@127.0.0.1:5432/inspect_rag \
+python -m pytest -m "not neural"
 ```
 
-Run it once after `make up` before relying on the Elasticsearch backend.
+Each context gets uniquely prefixed indexes and its own database, removed when the session ends.
+
+### Elasticsearch on a nearly full disk
+
+Elasticsearch stops allocating shards when the disk holding its data is more than 90% full (high
+watermark); index creation then hangs until the request times out. Free disk space, or — for local
+development only — disable the check:
+
+```bash
+curl -X PUT localhost:9200/_cluster/settings -H 'Content-Type: application/json' \
+  -d '{"persistent": {"cluster.routing.allocation.disk.threshold_enabled": false}}'
+```
 
 ## Configuration
 

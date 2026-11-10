@@ -17,18 +17,25 @@ frozen configuration once on the held-out test set.
 | Component | Status |
 |---|---|
 | `inspect_legacy` / `inspect_meds` adapters | Synthetic or generated fixtures only; real file/column names unknown |
-| Elasticsearch backend, PostgreSQL, Docker Compose, images | Written, DSL unit-tested; never run against live services here |
 | `inspect_pretrained` image provider | Integration contract only; no weights; usefulness for similarity unproven |
 | LLM generation (Ollama / vLLM / Hugging Face) and LLM query rewriting / HyDE | Tested with a scripted fake client only; no local LLM was available, so G02–G06, R10 and R12 report "failed"/"skipped" |
 | GPU execution | CPU only so far |
 | MLflow logging, OpenTelemetry export | Optional paths, not exercised |
 | Scale (≈20k studies, millions of events) | Streaming/batched design, but only measured on 189 synthetic cases |
+| Compose `llm` (Ollama) and `tracking` (MLflow) profiles | Defined but never started |
 
 ## Verified
 
-Backend unit, integration, security and leakage tests; real MiniLM, E5, BGE, MedCPT (query + article
-encoders) and both cross-encoders run end to end on the synthetic cohort; frontend build, lint and
-Playwright end-to-end tests against the live API.
+Backend unit, integration, security and leakage tests — on the local backend + SQLite and again on
+live Elasticsearch 8.15.3 + PostgreSQL 16; real MiniLM, E5, BGE, MedCPT (query + article encoders)
+and both cross-encoders run end to end on the synthetic cohort on both backends; the Alembic
+migration on PostgreSQL; the Docker Compose stack (images, migration on start, workflow inside the
+container, UI and API through nginx); frontend build, lint and Playwright end-to-end tests against
+the live API on both backends.
+
+On the synthetic cohort the two search backends give near-identical quality (nDCG@10 within about
+0.01; differences come from Elasticsearch's analyzer and HNSW search). The committed example report
+was produced on the local backend.
 
 ## Design decisions worth knowing
 
@@ -38,6 +45,8 @@ Playwright end-to-end tests against the live API.
 * **Local search backend** exists for CPU-only, infrastructure-free runs and hermetic tests. It uses
   exact kNN, so its latency and recall behaviour differ from Elasticsearch's approximate kNN;
   performance conclusions must come from the Elasticsearch backend.
+* **Deep result pages on Elasticsearch** (beyond `index.max_result_window`, 10,000) are read with
+  `search_after`; this is used when laboratory or diagnosis similarity ranks every eligible case.
 * **Hashing embedding** is a dependency-free smoke baseline, not one of the four compared models.
 * **Intensity-histogram image encoder** is a transparent placeholder for the multimodal code path.
 * **Query-case encoding** for dense retrieval defaults to the document encoder

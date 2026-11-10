@@ -5,7 +5,8 @@ for the Stanford INSPECT dataset.
 
 > **Research prototype. Not for diagnosis, treatment decisions or any clinical use.**
 > No INSPECT experiment has been run with this code yet: the dataset is access-controlled, so
-> everything was developed and verified on fabricated synthetic fixtures. Synthetic results show that
+> everything was developed and verified on fabricated synthetic fixtures (on both search backends,
+> including the Docker Compose stack). Synthetic results show that
 > the pipeline works — they are not evidence of clinical retrieval performance.
 > See [docs/limitations.md](docs/limitations.md).
 
@@ -125,6 +126,9 @@ make test-neural  # real embedding models, when PyTorch and weights are availabl
 make lint         # ruff, mypy, eslint, tsc
 make e2e          # Playwright against the live API (after make e2e-prepare)
 ```
+
+The same suite can run against live Elasticsearch and PostgreSQL
+(see [docs/deployment.md](docs/deployment.md#testing-against-live-services)).
 
 Covered: stable case ids, schema detection, joins and duplicate handling, unit conversion, missing
 measurements, temporal cutoffs, chunk boundaries, encoding contracts, RRF, case aggregation,

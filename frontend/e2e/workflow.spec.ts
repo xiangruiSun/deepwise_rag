@@ -86,6 +86,8 @@ test.describe("research workflow on the synthetic cohort", () => {
     await page.goto("/evaluation");
     await expect(page.getByRole("heading", { name: "Evaluation dashboard" })).toBeVisible();
     await expect(page.getByText(/SYNTHETIC DATA — not clinical evidence/)).toBeVisible();
+    // other suites may have been recorded too; look at the baseline suite explicitly
+    await page.getByTestId("suite-select").selectOption("smoke");
     const table = page.getByTestId("experiment-table");
     await expect(table.getByRole("button", { name: "S01" })).toBeVisible();
     await expect(page.getByTestId("metric-chart")).toBeVisible();

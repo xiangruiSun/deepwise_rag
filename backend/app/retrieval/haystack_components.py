@@ -10,6 +10,7 @@ inspect-rag[haystack]``).
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from app.core.config import AggregationConfig, FusionConfig
@@ -100,11 +101,7 @@ class DocumentFusion:
         else:
             fused = weighted_score_fusion({n: {d.id: float(d.score or 0.0) for d in docs} for n, docs in lists.items()},
                                           weights=self.config.weights, normalization=self.config.normalization)
-        out = []
-        for item in fused[: self.top_k]:
-            doc = by_id[item.item_id]
-            doc.score = item.score
-            out.append(doc)
+        out = [replace(by_id[item.item_id], score=item.score) for item in fused[: self.top_k]]
         return {"documents": out}
 
 

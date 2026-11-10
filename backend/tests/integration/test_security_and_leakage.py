@@ -17,6 +17,7 @@ from app.main import create_app
 from app.retrieval.features import CaseFeatureService
 from app.schemas.rag import CompareRequest, RagRequest
 from app.schemas.search import SearchRequest
+from tests.conftest import cases_index
 
 RESEARCH = {"X-API-Key": "researcher-key"}
 PRIVILEGED = {"X-API-Key": "restricted-key"}
@@ -213,7 +214,7 @@ def test_future_records_never_enter_query_features(ctx: AppContext, queries: lis
 
 
 def test_indexed_filter_metadata_contains_no_future_information(ctx: AppContext) -> None:
-    hits, total = ctx.backend.filter_search("cases_v1", None, 1000)
+    hits, total = ctx.backend.filter_search(cases_index(ctx), None, 1000)
     assert total == 189
     with ctx.session_factory() as session:
         cases = {c.case_id: c for c in session.scalars(select(ClinicalCase))}

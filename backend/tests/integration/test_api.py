@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.core.container import AppContext
 from app.main import create_app
+from tests.conftest import report_index
 
 H = {"X-API-Key": "researcher-key"}
 ADMIN = {"X-API-Key": "test-admin-key"}
@@ -120,7 +121,7 @@ def test_compare_and_rag_endpoints(client: TestClient, queries: list[dict[str, A
 
 def test_admin_indexes_and_audit_trail(ctx: AppContext, client: TestClient) -> None:
     indexes = {i["index_name"]: i for i in client.get("/api/v1/admin/indexes", headers=ADMIN).json()}
-    hashing = indexes["report_chunks_v1_hashing"]
+    hashing = indexes[report_index(ctx, "hashing")]
     assert hashing["exists"] and hashing["dimension"] == 384 and hashing["health"] == "green"
     assert hashing["embedding_model_id"] == "hashing-ngram-v1" and hashing["document_count"] == 188
     assert client.get("/api/v1/admin/ingestion/unknown", headers=ADMIN).status_code == 404

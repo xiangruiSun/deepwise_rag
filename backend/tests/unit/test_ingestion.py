@@ -20,7 +20,7 @@ from app.db.models import (
     RetrievalDocument,
 )
 from app.ingestion.text import clean_impression, meaning_preserved, sentence_spans
-from tests.conftest import make_context
+from tests.conftest import cases_index, make_context, report_index
 
 
 def test_validation_counts_and_failed_rows(ctx: AppContext) -> None:
@@ -128,14 +128,14 @@ def test_incremental_ingestion_skips_unchanged_sources(mutable_ctx: tuple[AppCon
     assert report.counts["event_files_unchanged"] == 3 and not report.changed_case_ids
     before = ctx.embeddings.cache.misses
     summary = build_indexes(ctx)
-    index = next(s for s in summary["report_indexes"] if s["index"].endswith("_hashing"))
+    index = next(s for s in summary["report_indexes"] if s["index"] == report_index(ctx, "hashing"))
     assert index["indexed_or_updated"] == 0 and index["unchanged"] == 188
     assert ctx.embeddings.cache.misses == before  # nothing was re-embedded
 
 
 def test_changed_and_deleted_sources_propagate_to_indexes(mutable_ctx: tuple[AppContext, Path]) -> None:
     ctx, root = mutable_ctx
-    index = "report_chunks_v1_hashing"
+    index = report_index(ctx, "hashing")
     with ctx.session_factory() as session:
         docs = list(session.scalars(select(RetrievalDocument).where(RetrievalDocument.index_version == index)
                                     .order_by(RetrievalDocument.source_id)))
@@ -167,7 +167,7 @@ def test_changed_and_deleted_sources_propagate_to_indexes(mutable_ctx: tuple[App
     assert ctx.backend.get_document(index, changed_doc.document_id)["content"] == marker
     hits = ctx.backend.bm25_search(index, "zebrafish", None, 5)
     assert [h.id for h in hits] == [changed_doc.document_id]
-    assert ctx.backend.get_document("cases_v1", deleted_case) is None
+    assert ctx.backend.get_document(cases_index(ctx), deleted_case) is None
     with ctx.session_factory() as session:
         assert session.get(ClinicalCase, deleted_case) is None
         assert session.get(RetrievalDocument, deleted_doc.document_id) is None

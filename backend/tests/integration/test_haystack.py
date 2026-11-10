@@ -8,6 +8,7 @@ from app.core.container import AppContext
 from app.core.security import AccessPolicy
 from app.indexing.backend import FilterSpec
 from app.schemas.search import SearchRequest
+from tests.conftest import report_index
 
 pytest.importorskip("haystack")
 
@@ -18,8 +19,8 @@ def test_haystack_pipeline_matches_native_hybrid_retrieval(ctx: AppContext, poli
 
     recipe = ctx.config.recipes["hybrid_rrf_hashing"]
     pipeline = build_hybrid_pipeline(
-        BM25Retriever(ctx.backend, "report_chunks_v1_lexical"),
-        DenseRetriever(ctx.backend, "report_chunks_v1_hashing", ctx.embeddings.embedder("hashing")),
+        BM25Retriever(ctx.backend, report_index(ctx, None)),
+        DenseRetriever(ctx.backend, report_index(ctx, "hashing"), ctx.embeddings.embedder("hashing")),
         recipe.fusion, recipe.aggregation, recipe.bm25_top_k, recipe.dense_top_k,
         recipe.dense_num_candidates, recipe.fused_top_k,
     )

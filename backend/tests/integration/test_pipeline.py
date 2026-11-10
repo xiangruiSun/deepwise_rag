@@ -21,7 +21,7 @@ from app.evaluation.retrieval_metrics import evaluate_query
 from app.evaluation.runner import ExperimentRunner
 from app.schemas.rag import CompareRequest
 from app.schemas.search import LabFilter, SearchRequest
-from tests.conftest import CONFIG_DIR, make_config
+from tests.conftest import CONFIG_DIR, cases_index, image_index, make_config, report_index
 
 RECIPES = ("bm25", "dense_hashing", "hybrid_rrf_hashing", "multimodal_hashing")
 
@@ -37,10 +37,11 @@ def test_cohort_is_retrievable_by_case_id_and_indexes_exist(ctx: AppContext, cas
         manifests = {m.index_name: m for m in session.scalars(select(IndexManifest))}
         stats = {s.stats_version for s in session.scalars(select(LabNormalizationStat))}
         assert all(s.fitted_split == "train" for s in session.scalars(select(LabNormalizationStat)))
-    assert {"cases_v1", "report_chunks_v1_lexical", "report_chunks_v1_hashing", "image_features_v1"} <= set(manifests)
-    assert manifests["report_chunks_v1_hashing"].dimension == 384
-    assert manifests["report_chunks_v1_hashing"].document_count == 188
-    assert manifests["cases_v1"].document_count == 189
+    hashing = report_index(ctx, "hashing")
+    assert {cases_index(ctx), report_index(ctx, None), hashing, image_index(ctx)} <= set(manifests)
+    assert manifests[hashing].dimension == 384
+    assert manifests[hashing].document_count == 188
+    assert manifests[cases_index(ctx)].document_count == 189
     assert {"train-lb7-last", "train-lb30-last", "train-lb90-mean"} <= stats
 
 
@@ -186,7 +187,7 @@ def test_parent_child_retrieval_returns_full_parent_impression(synthetic_root: P
     policy = AccessPolicy(Principal("t", Role.RESEARCHER, frozenset({"research"})))
     response = search(ctx, policy, query_mode="text", query_text="right heart strain septum flattening", top_k=5,
                       retrieval_recipe_id="pc")
-    assert ctx.backend.count("report_chunks_v1_lexical__parent_child") > 188  # impressions were split
+    assert ctx.backend.count(report_index(ctx, None, "parent_child")) > 188  # impressions were split
     assert len({r.case_id for r in response.results}) == len(response.results) == 5
     evidence = response.results[0].evidence[0]
     assert evidence.matched_text and evidence.matched_text in evidence.excerpt
