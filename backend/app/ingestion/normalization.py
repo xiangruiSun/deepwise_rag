@@ -104,6 +104,9 @@ _UNIT_ALIASES = {
     "10*9/l": "k/ul",
     "10^9/l": "k/ul",
     "bpm": "/min",
+    "insp/min": "/min",
+    "breaths/min": "/min",
+    "mm hg": "mmhg",
     "beats/min": "/min",
     "ng/ml feu": "ng/ml feu",
     "mg/l feu": "mg/l feu",
@@ -174,9 +177,21 @@ DEFAULT_LAB_CONCEPTS: tuple[LabConcept, ...] = (
     LabConcept("hemoglobin", "Hemoglobin", ("LOINC/718-7",), "g/dl", {"g/l": 0.1}),
     LabConcept("wbc", "Leukocytes", ("LOINC/6690-2",), "k/ul", {"/ul": 0.001}),
     LabConcept("platelets", "Platelets", ("LOINC/777-3",), "k/ul", {"/ul": 0.001}),
-    LabConcept("lactate", "Lactate", ("LOINC/2524-7",), "mmol/l", {"mg/dl": 1.0 / 9.01}),
+    LabConcept("lactate", "Lactate", ("LOINC/2524-7", "LOINC/32693-4"), "mmol/l", {"mg/dl": 1.0 / 9.01}),
     LabConcept("heart_rate", "Heart rate", ("LOINC/8867-4",), "/min", {}),
     LabConcept("spo2", "Oxygen saturation (pulse oximetry)", ("LOINC/59408-5",), "%", {}),
+    # Routine chemistry, haematology and vital signs.  mEq/L equals mmol/L for these
+    # monovalent ions, so that pair is an exact, explicitly listed conversion.
+    LabConcept("sodium", "Sodium", ("LOINC/2951-2",), "mmol/l", {"meq/l": 1.0}),
+    LabConcept("potassium", "Potassium", ("LOINC/2823-3",), "mmol/l", {"meq/l": 1.0}),
+    LabConcept("chloride", "Chloride", ("LOINC/2075-0",), "mmol/l", {"meq/l": 1.0}),
+    LabConcept("bicarbonate", "Bicarbonate", ("LOINC/1963-8",), "mmol/l", {"meq/l": 1.0}),
+    LabConcept("urea_nitrogen", "Urea nitrogen", ("LOINC/3094-0",), "mg/dl", {"mmol/l": 2.801}),
+    LabConcept("glucose", "Glucose", ("LOINC/2345-7",), "mg/dl", {"mmol/l": 18.016}),
+    LabConcept("hematocrit", "Hematocrit", ("LOINC/4544-3",), "%", {}),
+    LabConcept("respiratory_rate", "Respiratory rate", ("LOINC/9279-1",), "/min", {}),
+    LabConcept("systolic_bp", "Systolic blood pressure", ("LOINC/8480-6",), "mmhg", {}),
+    LabConcept("diastolic_bp", "Diastolic blood pressure", ("LOINC/8462-4",), "mmhg", {}),
 )
 
 

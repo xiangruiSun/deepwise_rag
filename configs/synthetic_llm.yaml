@@ -1,0 +1,22 @@
+# Synthetic data with a small local open-source LLM as the answer generator.
+#
+#   docker compose --profile llm up -d
+#   docker compose exec ollama ollama pull llama3.2:1b
+#   INSPECT_RAG_APP_CONFIG=synthetic_llm.yaml docker compose up -d backend
+#
+# Llama 3.2 1B (Meta, ~1.3 GB, runs on CPU) is the smallest widely used open-weight chat model.
+# The same model also powers the optional LLM query transformations (llm_rewrite, hyde).
+# Every generated statement still passes citation verification; unsupported ones are removed.
+extends: synthetic.yaml
+
+generation:
+  key: llama32_1b
+  backend: ollama
+  model: "llama3.2:1b"
+  prompt_variant: structured_citations
+  post_verification: true
+  timeout_seconds: 300
+  # a small prompt keeps a CPU-only model responsive and within its abilities
+  max_cases: 3
+  max_evidence_per_case: 6
+  max_output_tokens: 500

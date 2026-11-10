@@ -138,6 +138,15 @@ Generators: `extractive` (deterministic, model-free, default), `ollama`, `openai
 * Research labels (PE status, outcomes) live in a separate table, are not filterable and never enter
   query features.
 
+## Dataset adapters
+
+`synthetic`, `inspect_legacy` (cohort CSV + impression CSV + FEMR-style event CSVs), `inspect_meds`
+(MEDS Parquet) and `prepared` — open datasets converted to the canonical CSV layout by
+`prepare-dataset` (`app/ingestion/converters/`), identified by a `DATASET.json` marker. All adapters
+emit the same canonical rows; nothing downstream knows which dataset it is, except that reports and
+the API name it (`data_kind`) and the text record carries the dataset's own label
+(`dataset.text_label`, e.g. "Patient summary").
+
 ## Known deviations and open items
 
 See [limitations.md](limitations.md).

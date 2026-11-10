@@ -329,7 +329,13 @@ export default function SearchPage({
                 <div className="panel empty">No authorized case matches this query and these filters.</div>
               )}
               {response.results.map((result) => (
-                <ResultCard key={result.case_id} result={result} selected={selected.includes(result.case_id)} onToggle={onToggle} />
+                <ResultCard
+                  key={result.case_id}
+                  result={result}
+                  selected={selected.includes(result.case_id)}
+                  onToggle={onToggle}
+                  textLabel={meta.text_label}
+                />
               ))}
             </section>
           </>

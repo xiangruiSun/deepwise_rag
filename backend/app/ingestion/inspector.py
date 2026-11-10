@@ -186,6 +186,8 @@ class DatasetInspector:
         warnings: list[str] = []
         if (self.root / SYNTHETIC_MARKER).exists():
             return "synthetic", warnings
+        if (self.root / "DATASET.json").exists():
+            return "prepared", warnings
         tables = [i for i in infos if i.kind in ("csv", "tsv", "parquet")]
         lower_cols = [{c.lower() for c in i.columns} for i in tables]
         has_meds = any(

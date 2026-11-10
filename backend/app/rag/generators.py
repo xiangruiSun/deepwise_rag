@@ -23,10 +23,10 @@ from typing import Any
 
 import httpx
 
-from app.core.config import GenerationConfig
+from app.core.config import GenerationConfig, get_settings
 from app.core.errors import ConfigurationError, DependencyUnavailable
 from app.rag.evidence import EvidenceBundle, EvidenceItem, estimate_tokens
-from app.rag.prompts import build_prompt
+from app.rag.prompts import PROMPT_VERSION, build_prompt
 from app.schemas.rag import Claim, RagAnswer
 
 
@@ -49,28 +49,48 @@ class LLMClient(ABC):
 
 
 class OllamaClient(LLMClient):
-    def __init__(self, base_url: str, model: str, timeout: float) -> None:
+    def __init__(self, base_url: str, model: str, timeout: float, context_window: int = 8192) -> None:
         self.base_url, self.model, self.timeout = base_url.rstrip("/"), model, timeout
+        self.context_window = context_window
 
     def chat(self, system: str, user: str, max_tokens: int, temperature: float,
              json_mode: bool = True) -> LLMResult:
         payload: dict[str, Any] = {
             "model": self.model, "stream": False,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "options": {"temperature": temperature, "num_predict": max_tokens},
+            # num_ctx: Ollama's default window is far smaller than the evidence budget and an
+            # oversized prompt is truncated from the front (the instructions) without an error.
+            "options": {"temperature": temperature, "num_predict": max_tokens, "seed": 0,
+                        "num_ctx": self.context_window},
         }
         if json_mode:
             payload["format"] = "json"
         t0 = time.perf_counter()
         try:
             response = httpx.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
-            response.raise_for_status()
         except httpx.HTTPError as exc:
-            raise DependencyUnavailable(f"Ollama request failed: {type(exc).__name__}") from exc
+            raise DependencyUnavailable(
+                f"Ollama request failed: {type(exc).__name__}", {"base_url": self.base_url}
+            ) from exc
+        if response.status_code == 404:
+            raise DependencyUnavailable(
+                f"model '{self.model}' is not available on the Ollama server; pull it first "
+                f"(ollama pull {self.model})", {"base_url": self.base_url}
+            )
+        if response.status_code >= 400:
+            raise DependencyUnavailable(f"Ollama request failed: HTTP {response.status_code}",
+                                        {"base_url": self.base_url})
         data = response.json()
+        input_tokens = int(data.get("prompt_eval_count") or estimate_tokens(system + user))
+        if input_tokens + max_tokens > self.context_window:
+            raise DependencyUnavailable(
+                "the prompt does not fit the model context window together with the answer; raise "
+                "generation.context_window or lower generation.context_token_budget",
+                {"context_window": self.context_window, "prompt_tokens": input_tokens},
+            )
         return LLMResult(
             text=data.get("message", {}).get("content", ""),
-            input_tokens=int(data.get("prompt_eval_count") or estimate_tokens(system + user)),
+            input_tokens=input_tokens,
             output_tokens=int(data.get("eval_count") or 0),
             latency_ms=(time.perf_counter() - t0) * 1000.0,
         )
@@ -140,7 +160,8 @@ def build_llm_client(config: GenerationConfig) -> LLMClient | None:
     if backend == "extractive":
         return None
     if backend == "ollama":
-        return OllamaClient(config.base_url or "http://localhost:11434", config.model, config.timeout_seconds)
+        return OllamaClient(config.base_url or get_settings().ollama_base_url, config.model,
+                            config.timeout_seconds, config.context_window)
     if backend == "openai_compatible":
         if not config.base_url:
             raise ConfigurationError("openai_compatible generation backend requires base_url")
@@ -225,7 +246,7 @@ class ExtractiveGenerator(Generator):
         for cid in bundle.all_case_ids:
             for item in reports[cid][:1]:
                 role = "Query case" if cid == query_id else "Retrieved case"
-                quote = item.text.removeprefix("Radiology impression: ").strip()
+                quote = item.text.split(": ", 1)[-1].strip()
                 answer.summary.append(
                     Claim(text=f'{role} {cid}: the documented impression states "{_shorten(quote)}"',
                           citations=[item.source_id])
@@ -335,11 +356,15 @@ class LLMGenerator(Generator):
         result = self.client.chat(system, user, self.config.max_output_tokens, self.config.temperature)
         metadata = {
             "backend": self.config.backend, "model": self.config.model,
-            "prompt_variant": self.config.prompt_variant, "input_tokens": result.input_tokens,
+            "prompt_variant": self.config.prompt_variant, "prompt_version": PROMPT_VERSION,
+            "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens, "latency_ms": round(result.latency_ms, 3),
             "temperature": self.config.temperature,
         }
-        parsed = parse_llm_json(result.text)
+        truncated = result.output_tokens >= self.config.max_output_tokens
+        parsed = parse_llm_json(result.text, allow_truncated=truncated)
+        if parsed is not None and parsed.pop("_truncated", False):
+            metadata["output_truncated"] = True
         if parsed is None:
             return RagAnswer(
                 status="insufficient_evidence",
@@ -352,13 +377,20 @@ class LLMGenerator(Generator):
             summary=_claims(parsed.get("summary")),
             similarities=_claims(parsed.get("similarities")),
             differences=_claims(parsed.get("differences")),
-            missing_evidence=[str(m) for m in parsed.get("missing_evidence") or [] if str(m).strip()],
-            limitations=[str(m) for m in parsed.get("limitations") or [] if str(m).strip()],
+            missing_evidence=_notes(parsed.get("missing_evidence")),
+            limitations=_notes(parsed.get("limitations")),
+            warnings=(["The model answer reached the output limit; its incomplete last statement was "
+                       "discarded."] if metadata.get("output_truncated") else []),
             generation_metadata=metadata,
         )
 
 
-def parse_llm_json(text: str) -> dict[str, Any] | None:
+def parse_llm_json(text: str, allow_truncated: bool = False) -> dict[str, Any] | None:
+    """Parse a model reply as one JSON object.
+
+    With ``allow_truncated`` a reply that was cut off by the output-token limit is repaired by
+    dropping the incomplete last element and closing the open brackets; the recovered object
+    carries ``"_truncated": True`` so the caller can say so."""
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?|```$", "", text).strip()
@@ -366,27 +398,86 @@ def parse_llm_json(text: str) -> dict[str, Any] | None:
         value = json.loads(text)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            return None
-        try:
-            value = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return None
+        value = None
+        if match:
+            try:
+                value = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                value = None
+        if value is None and allow_truncated:
+            value = _repair_truncated(text)
+            if isinstance(value, dict):
+                value["_truncated"] = True
     return value if isinstance(value, dict) else None
+
+
+def _repair_truncated(text: str) -> Any:
+    """Cut a truncated JSON document after its last complete element and close it."""
+    start = text.find("{")
+    if start < 0:
+        return None
+    text = text[start:]
+    stack: list[str] = []
+    in_string = escaped = False
+    cut: tuple[int, list[str]] | None = None  # (index of the last element separator, open brackets there)
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if not stack or stack.pop() != ch:
+                return None
+        elif ch == "," and stack:
+            cut = (i, list(stack))
+    if cut is None:
+        return None
+    index, open_brackets = cut
+    try:
+        return json.loads(text[:index] + "".join(reversed(open_brackets)))
+    except json.JSONDecodeError:
+        return None
+
+
+_HAS_CONTENT = re.compile(r"[^\W_]")  # at least one letter or digit
+_SOURCE_ID = re.compile(r"S\d+")
+_INLINE_ID = re.compile(r"(?<![A-Za-z0-9_])(S\d+)(?![A-Za-z0-9_])")
+_INLINE_TAG = re.compile(r"</?S\d+>|\[S\d+(?:\s*,\s*S\d+)*\]|\(S\d+(?:\s*,\s*S\d+)*\)")
+
+
+def _notes(raw: Any) -> list[str]:
+    """Free-text list entries; placeholder-only entries ("...", "-") are dropped."""
+    if isinstance(raw, str):
+        raw = [raw]
+    return [str(m).strip() for m in raw or [] if _HAS_CONTENT.search(str(m))]
 
 
 def _claims(raw: Any) -> list[Claim]:
     claims: list[Claim] = []
-    for entry in raw or []:
+    if not isinstance(raw, list):
+        return claims
+    for entry in raw:
         if isinstance(entry, str):
-            text, cites = entry, re.findall(r"\[(S\d+)\]", entry)
+            text, listed = entry, []
         elif isinstance(entry, dict):
             text = str(entry.get("text", ""))
-            cites = [str(c).strip("[] ") for c in entry.get("citations") or []]
+            raw_cites = entry.get("citations") or []
+            listed = [str(c).strip("[]<>/ ") for c in (raw_cites if isinstance(raw_cites, list) else [raw_cites])]
         else:
             continue
-        if text.strip():
-            claims.append(Claim(text=text.strip(), citations=list(dict.fromkeys(cites))))
+        # Models often cite inline ("... [S1]", "<S2>...</S2>") instead of, or as well as, in the
+        # list.  Inline ids are citations too; they are validated like any other reference.
+        cites = [c for c in listed if _SOURCE_ID.fullmatch(c)] + _INLINE_ID.findall(text)
+        text = " ".join(_INLINE_TAG.sub(" ", text).split())
+        if _HAS_CONTENT.search(text):  # a placeholder such as "..." is not a claim
+            claims.append(Claim(text=text, citations=list(dict.fromkeys(cites))))
     return claims
 
 

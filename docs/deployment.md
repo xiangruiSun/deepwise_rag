@@ -22,15 +22,41 @@ make up                 # postgres, elasticsearch, backend (runs alembic), front
 docker compose exec backend python -m app.cli generate-synthetic
 docker compose exec backend python -m app.cli ingest
 docker compose exec backend python -m app.cli reindex
-docker compose --profile llm up -d        # optional Ollama
+docker compose --profile llm up -d        # optional Ollama (see "Local LLM generation")
 docker compose --profile tracking up -d   # optional MLflow
 ```
 
 The stack was run end to end on synthetic data (Docker Desktop 4.99, Elasticsearch 8.15.3,
 PostgreSQL 16.4): images build, the backend applies the Alembic migration on start, ingestion,
 indexing and the baseline suite run inside the container, and the UI and API work through the nginx
-frontend on port 8080. The published image tags for the optional `llm` and `tracking` profiles were
-not started.
+frontend on port 8080. The `llm` profile (Ollama 0.3.12) was run with Llama 3.2 1B and Qwen 2.5 1.5B;
+the `tracking` profile (MLflow) was not started.
+
+### Local LLM generation (Ollama)
+
+The default generator is extractive and needs no model. To generate answers with a local
+open-source model instead:
+
+```bash
+docker compose --profile llm up -d                     # adds the Ollama server
+docker compose exec ollama ollama pull llama3.2:1b     # ~1.3 GB, once (make pull-llm also pulls qwen2.5:1.5b)
+INSPECT_RAG_APP_CONFIG=synthetic_llm.yaml INSPECT_RAG_REQUEST_TIMEOUT_SECONDS=110 docker compose up -d backend
+```
+
+`configs/synthetic_llm.yaml` (and `baseline_llm.yaml` for INSPECT) set `generation.backend: ollama`
+with Llama 3.2 1B, the smallest widely used open-weight chat model. The model runs on your machine;
+no report text leaves it. Its answers go through the same citation verification as every other
+generator, and the same model serves the optional `llm_rewrite` / `hyde` query transformations.
+
+* The backend finds the server through `INSPECT_RAG_OLLAMA_BASE_URL` (Compose: `http://ollama:11434`;
+  outside Docker: `http://localhost:11434`).
+* Docker on macOS has no GPU access, so the container runs the model on CPU (tens of seconds per
+  answer). A native Ollama install uses the Apple GPU and is several times faster; point the backend
+  at it with `INSPECT_RAG_OLLAMA_BASE_URL=http://host.docker.internal:11434`.
+* `generation.context_window` (default 8192) is sent to Ollama as `num_ctx`. Ollama's own default is
+  smaller than the evidence budget and silently truncates the prompt, instructions first.
+* A larger model is a one-line change (`generation.model`, e.g. `llama3.2:3b`); compare candidates
+  with `experiments/generation_comparison.yaml` before switching.
 
 ### Testing against live services
 

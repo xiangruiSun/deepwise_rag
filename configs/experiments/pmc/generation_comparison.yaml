@@ -1,0 +1,25 @@
+# PMC-Patients — generation on real case summaries with frozen BM25 retrieval.
+# G01 needs no model. G02 and G03 need the local Ollama server with llama3.2:1b pulled.
+# There is no gold answer for these questions: completeness is not measured; the run reports the
+# automated faithfulness and citation diagnostics, abstention on out-of-scope questions, and cost.
+suite_id: generation_comparison
+description: PMC-Patients — extractive baseline versus a small local LLM, with and without verification.
+base_config: pmc_patients.yaml
+stage: validation
+baseline_experiment: G01
+generation_variants:
+  extractive:
+    {key: extractive, backend: extractive, model: extractive-evidence-v1, post_verification: true,
+     max_cases: 3, max_evidence_per_case: 2, context_token_budget: 3000, max_item_tokens: 600}
+  llama_unverified:
+    {key: llama_unverified, backend: ollama, model: "llama3.2:1b", prompt_variant: structured_citations,
+     post_verification: false, timeout_seconds: 300, max_cases: 3, max_evidence_per_case: 2,
+     context_token_budget: 3000, max_item_tokens: 600, max_output_tokens: 500}
+  llama_verified:
+    {key: llama_verified, backend: ollama, model: "llama3.2:1b", prompt_variant: structured_citations,
+     post_verification: true, timeout_seconds: 300, max_cases: 3, max_evidence_per_case: 2,
+     context_token_budget: 3000, max_item_tokens: 600, max_output_tokens: 500}
+runs:
+  - {experiment_id: G01, recipe: bm25, generation: extractive, description: Extractive evidence composer (no LLM)}
+  - {experiment_id: G02, recipe: bm25, generation: llama_unverified, description: Llama 3.2 1B without post-verification}
+  - {experiment_id: G03, recipe: bm25, generation: llama_verified, description: Llama 3.2 1B with post-verification}

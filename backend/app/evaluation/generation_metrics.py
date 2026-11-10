@@ -8,6 +8,9 @@ given to the generator, and the evaluation item:
 * faithfulness            — share of claims supported by their cited evidence
 * citation_correctness    — share of citations that resolve to evidence in context
 * citation_coverage       — share of claims carrying at least one valid citation
+* citation_relevance      — share of valid citations whose record shares a content word or
+                             number with its claim (detects padded, unrelated references)
+* parse_failure           — the model reply was not a parseable structured answer
 * completeness            — share of expected terms / numeric facts present
 * abstention_correctness  — abstained iff the item expects abstention
 * contradiction_rate      — share of claims whose polarity conflicts with the evidence
@@ -26,7 +29,7 @@ from typing import Any
 
 import numpy as np
 
-from app.rag.citations import assess_claim_support
+from app.rag.citations import assess_claim_support, citation_grounding
 from app.rag.evidence import EvidenceBundle
 from app.rag.generators import LLMClient, parse_llm_json
 from app.schemas.rag import RagAnswer
@@ -41,9 +44,10 @@ def evaluate_answer(answer: RagAnswer, bundle: EvidenceBundle | None, item: dict
         "abstention_correctness": 1.0 if abstained == expects_abstention else 0.0,
         "answer_relevance": None, "faithfulness": None, "citation_correctness": None,
         "citation_coverage": None, "completeness": None, "contradiction_rate": None,
-        "numeric_accuracy": None,
+        "numeric_accuracy": None, "citation_relevance": None,
     }
     meta = answer.generation_metadata
+    metrics["parse_failure"] = 1.0 if meta.get("parse_error") else 0.0
     metrics["input_tokens"] = float(meta.get("input_tokens") or 0)
     metrics["output_tokens"] = float(meta.get("output_tokens") or 0)
     latency = meta.get("generation_latency_ms")
@@ -64,8 +68,10 @@ def evaluate_answer(answer: RagAnswer, bundle: EvidenceBundle | None, item: dict
 
     supported, contradictions = 0, 0
     numeric_total, numeric_ok = 0, 0
+    grounded: list[bool] = []
     for claim in claims:
         cited = [sources[s] for s in claim.citations if s in sources]
+        grounded.extend(citation_grounding(claim, cited))
         support = assess_claim_support(claim, cited)
         supported += int(support["supported"])
         contradictions += int(not support.get("polarity_ok", True))
@@ -75,6 +81,7 @@ def evaluate_answer(answer: RagAnswer, bundle: EvidenceBundle | None, item: dict
             numeric_total += len(numbers)
             numeric_ok += sum(1 for n in numbers if n in evidence_numbers)
     metrics["faithfulness"] = supported / len(claims)
+    metrics["citation_relevance"] = sum(grounded) / len(grounded) if grounded else None
     metrics["contradiction_rate"] = contradictions / len(claims)
     metrics["numeric_accuracy"] = numeric_ok / numeric_total if numeric_total else None
 

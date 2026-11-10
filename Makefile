@@ -9,7 +9,7 @@ NEURAL_SUITES := experiments/embedding_comparison.yaml experiments/chunking_comp
                  experiments/generation_comparison.yaml
 
 .DEFAULT_GOAL := help
-.PHONY: help setup setup-ml up down migrate test test-neural lint seed-synthetic index-baseline \
+.PHONY: help setup setup-ml up down up-llm pull-llm migrate test test-neural lint seed-synthetic index-baseline \
         run-baseline run-experiments run-neural-experiments select report serve frontend e2e-prepare e2e clean
 
 help: ## Show this help
@@ -30,7 +30,14 @@ up: ## Start PostgreSQL, Elasticsearch, backend and frontend with Docker Compose
 	docker compose up -d --build
 
 down: ## Stop the Docker Compose infrastructure
-	docker compose down
+	docker compose --profile llm --profile tracking down
+
+up-llm: ## Start the stack plus the local Ollama server
+	docker compose --profile llm up -d --build
+
+pull-llm: ## Download the small open-source generation models into the Ollama container
+	docker compose exec ollama ollama pull llama3.2:1b
+	docker compose exec ollama ollama pull qwen2.5:1.5b
 
 migrate: ## Apply database migrations (PostgreSQL deployments)
 	cd backend && $(PY) -m alembic upgrade head

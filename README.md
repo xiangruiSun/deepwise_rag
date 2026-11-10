@@ -4,10 +4,12 @@ Evaluation-driven, multimodal, patient-level clinical case retrieval with eviden
 for the Stanford INSPECT dataset.
 
 > **Research prototype. Not for diagnosis, treatment decisions or any clinical use.**
-> No INSPECT experiment has been run with this code yet: the dataset is access-controlled, so
-> everything was developed and verified on fabricated synthetic fixtures (on both search backends,
-> including the Docker Compose stack). Synthetic results show that
-> the pipeline works — they are not evidence of clinical retrieval performance.
+> No INSPECT experiment has been run with this code yet: the dataset is access-controlled. The code
+> was developed on fabricated synthetic fixtures (both search backends, including the Docker Compose
+> stack) and then run on two small open datasets, PMC-Patients and the MIMIC-IV demo
+> ([docs/open_datasets.md](docs/open_datasets.md)). Synthetic results show that the pipeline works;
+> the open-data results are real but come from different data than INSPECT (no CT images, no
+> radiology impressions). Neither is evidence of clinical retrieval performance on INSPECT.
 > See [docs/limitations.md](docs/limitations.md).
 
 ## What it does
@@ -26,7 +28,7 @@ predeclared protocol on validation data and evaluated once on a held-out test se
 
 | Area | Implementation |
 |---|---|
-| Ingestion | schema inspector, adapters (paper-described CSV layout, MEDS/Parquet, synthetic), validation reports, incremental updates with deletion propagation |
+| Ingestion | schema inspector, adapters (paper-described CSV layout, MEDS/Parquet, synthetic, prepared open datasets), converters for PMC-Patients and the MIMIC-IV demo, validation reports, incremental updates with deletion propagation |
 | Canonical store | PostgreSQL / SQLite via SQLAlchemy 2 + Alembic |
 | Search | Elasticsearch 8 (BM25, filters, kNN) or a local in-process backend with the same contract |
 | Embeddings | MiniLM, E5-base-v2, BGE-base-v1.5, MedCPT (query + article encoders), persistent cache |
@@ -39,7 +41,7 @@ predeclared protocol on validation data and evaluated once on a held-out test se
 
 Architecture: [docs/architecture.md](docs/architecture.md) · API: [docs/api.md](docs/api.md) ·
 Evaluation protocol: [docs/evaluation.md](docs/evaluation.md) · Dataset: [docs/dataset.md](docs/dataset.md) ·
-Deployment: [docs/deployment.md](docs/deployment.md)
+Deployment: [docs/deployment.md](docs/deployment.md) · Open datasets: [docs/open_datasets.md](docs/open_datasets.md)
 
 ## Quick start (synthetic data, CPU-only, no infrastructure)
 
@@ -61,12 +63,44 @@ Other commands: `make test`, `make lint`, `make run-experiments`, `make run-neur
 (after `make setup-ml`), `make select SUITE=<suite>`, `make e2e-prepare && make e2e`, `make up`,
 `make down`. `make help` lists everything.
 
+## Local LLM generation
+
+The default generator is extractive and needs no model. For generated answers, start the bundled
+Ollama server and use a config that names a model, for example Llama 3.2 1B (about 1.3 GB, CPU-capable):
+
+```bash
+make up-llm && make pull-llm
+INSPECT_RAG_APP_CONFIG=synthetic_llm.yaml INSPECT_RAG_REQUEST_TIMEOUT_SECONDS=110 docker compose up -d backend
+```
+
+The model runs locally and its statements pass the same citation verification as every other
+generator. Models this small are weak writers; see the measured comparison in
+[experiments/open_data/](experiments/open_data/README.md) and
+[docs/deployment.md](docs/deployment.md#local-llm-generation-ollama).
+
+## Real data without INSPECT access
+
+Two small, openly licensed, published datasets can stand in for INSPECT while access is pending:
+**PMC-Patients** (patient summaries with published similarity labels — tests text retrieval) and the
+**MIMIC-IV demo** (100 patients with laboratory values and diagnosis codes — tests the structured
+path). Neither has images. You download them yourself; `prepare-dataset` converts them:
+
+```bash
+cd backend
+python -m app.cli prepare-dataset pmc-patients     # needs data/pmc_patients/raw/
+python -m app.cli prepare-dataset mimic-demo       # needs data/mimic_iv_demo_meds/
+```
+
+Full steps, mapping decisions and caveats: [docs/open_datasets.md](docs/open_datasets.md). Results:
+[experiments/open_data/](experiments/open_data/README.md).
+
 ## CLI
 
 ```bash
 cd backend && source ../.venv/bin/activate
 
 python -m app.cli --help
+python -m app.cli prepare-dataset pmc-patients                      # convert a downloaded open dataset
 python -m app.cli inspect-dataset ../data/synthetic                 # files, schemas, layout
 python -m app.cli validate-dataset -c synthetic.yaml                # resolved column mapping
 python -m app.cli ingest                                            # incremental ingestion
@@ -118,6 +152,9 @@ A report generated from a full run of these suites on the **synthetic** cohort i
 [experiments/synthetic_verification/](experiments/synthetic_verification/report.md) as a worked
 example of the output format. It is pipeline verification only.
 
+`configs/experiments/pmc/` holds the same stages for PMC-Patients (embedding, chunking, retrieval,
+generation); their report is in [experiments/open_data/](experiments/open_data/README.md).
+
 ## Tests
 
 ```bash
@@ -144,10 +181,10 @@ backend/app/          FastAPI application (api, core, db, ingestion, imaging, em
 backend/tests/        unit and integration tests
 backend/alembic/      database migrations
 frontend/             React application and Playwright tests
-configs/              application configs and experiment suites
+configs/              application configs (synthetic, INSPECT, PMC-Patients, MIMIC-IV demo) and experiment suites
 experiments/          non-sensitive result summaries
 scripts/              setup helpers
-data/                 git-ignored; synthetic fixtures are generated, INSPECT is supplied by you
+data/                 git-ignored; synthetic fixtures are generated, INSPECT and the open datasets are supplied by you
 docs/                 architecture, API, evaluation, dataset, deployment, limitations
 ```
 

@@ -4,7 +4,15 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import type { CompareResponse } from "../types";
 
-export default function ComparePage({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
+export default function ComparePage({
+  selected,
+  onToggle,
+  textLabel = "Radiology impression",
+}: {
+  selected: string[];
+  onToggle: (id: string) => void;
+  textLabel?: string;
+}) {
   const [params] = useSearchParams();
   const fromUrl = (params.get("ids") ?? "").split(",").filter(Boolean);
   const ids = fromUrl.length ? fromUrl : selected;
@@ -118,7 +126,7 @@ export default function ComparePage({ selected, onToggle }: { selected: string[]
                 .map(([k, v]) => `${k.replace("_", " ")}: ${v ?? "unavailable"}`)
                 .join(" · ")}
             </p>
-            <h3>Radiology impression</h3>
+            <h3>{textLabel}</h3>
             {column.impressions.length === 0 && <p className="small muted">No impression available.</p>}
             {column.impressions.map((i) => (
               <blockquote className="excerpt" key={i.report_id}>

@@ -1,0 +1,15 @@
+# Authorized INSPECT data with a small LOCAL open-source LLM as the answer generator.
+# The model runs on your own machine through Ollama; no report text leaves it.
+# See synthetic_llm.yaml for how to start the model server. Not validated on real INSPECT data.
+extends: baseline.yaml
+
+generation:
+  key: llama32_1b
+  backend: ollama
+  model: "llama3.2:1b"
+  prompt_variant: structured_citations
+  post_verification: true
+  timeout_seconds: 300
+  max_cases: 3
+  max_evidence_per_case: 6
+  max_output_tokens: 500

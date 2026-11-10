@@ -51,6 +51,7 @@ from app.observability.metrics import (
     process_memory_mb,
 )
 from app.rag.pipeline import RagPipeline
+from app.rag.prompts import PROMPT_VERSION
 from app.retrieval.features import CaseFeatureService
 from app.schemas.rag import RagRequest
 from app.schemas.search import LabFilter, SearchRequest, SearchResponse
@@ -314,11 +315,16 @@ class ExperimentRunner:
         reranker = self.ctx.rerankers.get(recipe.reranker)
         if reranker is not None:
             model_revisions["reranker"] = reranker.metadata()
+        if recipe.query_enhancement.method in ("llm_rewrite", "hyde"):
+            # the transformation model comes from the application's generation configuration
+            llm = self.ctx.config.generation
+            model_revisions["query_enhancement_llm"] = {"backend": llm.backend, "model": llm.model}
         generation_cfg = suite.generation_variants.get(spec.generation) if spec.generation else None
         run_config = {
             "suite_id": suite.suite_id, "experiment_id": spec.experiment_id, "stage": suite.stage,
             "recipe": recipe.model_dump(mode="json"), "evaluation": eval_cfg.model_dump(mode="json"),
             "generation": generation_cfg.model_dump(mode="json") if generation_cfg else None,
+            "prompt_version": PROMPT_VERSION if generation_cfg and generation_cfg.backend != "extractive" else None,
             "dataset_fingerprint": fingerprint, "query_set_version": query_set.version,
             "qrels_version": qrels.version, "model_revisions": model_revisions,
             "index_versions": {k: v["embedding_identity"] for k, v in index_versions.items()},

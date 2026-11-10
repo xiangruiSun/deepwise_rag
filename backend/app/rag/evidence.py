@@ -102,8 +102,9 @@ class EvidenceBuilder:
 
     PRIORITY = ("report", "laboratory", "diagnosis", "imaging")
 
-    def __init__(self, config: GenerationConfig) -> None:
+    def __init__(self, config: GenerationConfig, text_label: str = "Radiology impression") -> None:
         self.config = config
+        self.text_label = text_label
 
     def build(
         self,
@@ -169,6 +170,11 @@ class EvidenceBuilder:
     def _item(self, role: str, ctx: CaseContext, record_type: str, record_id: str, text: str,
               data: dict[str, Any], raw_for_hash: str | None = None) -> EvidenceItem:
         safe = neutralize(text)
+        limit = self.config.max_item_tokens
+        if limit is not None and estimate_tokens(safe) > limit:
+            words = safe.split(" ")
+            keep = max(1, int(len(words) * limit / estimate_tokens(safe)))
+            safe = " ".join(words[:keep]) + " [record truncated]"
         return EvidenceItem(
             source_id="", record_type=record_type, record_id=record_id, case_id=ctx.case.case_id,
             role=role, text=safe, data=data, content_hash=sha256_text(raw_for_hash or text),
@@ -184,7 +190,7 @@ class EvidenceBuilder:
                 continue
             seen_text.add(report.impression_text)
             items.append(self._item(role, ctx, "report", report.report_id,
-                                    f"Radiology impression: {report.impression_text}",
+                                    f"{self.text_label}: {report.impression_text}",
                                     {"report_id": report.report_id}, raw_for_hash=report.impression_text))
         if ctx.labs is not None:
             for key in sorted(ctx.labs.features):
@@ -214,7 +220,7 @@ class EvidenceBuilder:
     def _missing(self, ctx: CaseContext) -> list[str]:
         gaps: list[str] = []
         if not ctx.reports:
-            gaps.append("no radiology impression is available")
+            gaps.append(f"no {self.text_label.lower()} is available")
         if ctx.labs is None or not ctx.labs.features:
             gaps.append("no comparable laboratory measurements in the lookback window")
         if ctx.labs is not None:

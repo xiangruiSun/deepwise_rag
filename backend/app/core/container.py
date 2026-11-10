@@ -41,7 +41,11 @@ class AppContext:
 
     @property
     def data_kind(self) -> str:
-        return "synthetic" if self.config.dataset.adapter == "synthetic" else "inspect"
+        adapter = self.config.dataset.adapter
+        if adapter == "synthetic":
+            return "synthetic"
+        # prepared open datasets are reported under their own name, never as INSPECT
+        return self.config.dataset.name[:16] if adapter == "prepared" else "inspect"
 
 
 def build_backend(settings: Settings, config: AppConfig) -> SearchBackend:
@@ -77,7 +81,8 @@ def build_context(
     llm_client = build_llm_client(config.generation)
     retrieval = RetrievalService(session_factory, backend, config, embeddings, rerankers, image_provider,
                                  QueryEnhancer(llm_client))
-    rag = RagPipeline(session_factory, retrieval, config, llm_client=llm_client)
+    rag = RagPipeline(session_factory, retrieval, config,
+                      llm_clients={config.generation.key: llm_client} if llm_client else None)
     comparison = ComparisonService(session_factory, config)
     return AppContext(settings, config, engine, session_factory, backend, embeddings, rerankers,
                       image_provider, retrieval, rag, comparison)

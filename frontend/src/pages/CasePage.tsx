@@ -63,7 +63,15 @@ function Preview({ caseId, image }: { caseId: string; image: ImageOut }) {
   );
 }
 
-export default function CasePage({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
+export default function CasePage({
+  selected,
+  onToggle,
+  textLabel = "Radiology impression",
+}: {
+  selected: string[];
+  onToggle: (id: string) => void;
+  textLabel?: string;
+}) {
   const { caseId = "" } = useParams();
   const location = useLocation();
   const [overview, setOverview] = useState<CaseOverview | null>(null);
@@ -132,7 +140,7 @@ export default function CasePage({ selected, onToggle }: { selected: string[]; o
       </section>
 
       <section className="panel">
-        <h2>Radiology impression</h2>
+        <h2>{textLabel}</h2>
         {reports.length === 0 && <p className="small muted">No impression is available for this case.</p>}
         {reports.map((report) => (
           <div key={report.report_id} id={`source-${report.report_id}`} className="source-target" data-testid="report">

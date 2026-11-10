@@ -1,0 +1,39 @@
+{
+  "dataset": "mimic_iv_demo",
+  "corpus_stays": 238,
+  "query_stays": 37,
+  "top_k": 5,
+  "recipes": {
+    "structured_lab": {
+      "queries_with_results": 36,
+      "queries_with_laboratory_similarity": 36,
+      "mean_overlapping_lab_concepts_in_results": 11.23,
+      "results_from_the_query_patient": 0,
+      "mean_dx_category_jaccard_top_k": 0.0396,
+      "mean_dx_category_jaccard_random_k": 0.0361,
+      "mean_dx_category_jaccard_all_corpus": 0.0397,
+      "queries_where_top_k_beats_corpus_mean": 18
+    },
+    "structured_dx": {
+      "queries_with_results": 37,
+      "queries_with_laboratory_similarity": 0,
+      "mean_overlapping_lab_concepts_in_results": 12.92,
+      "results_from_the_query_patient": 0,
+      "mean_dx_category_jaccard_top_k": 0.1667,
+      "mean_dx_category_jaccard_random_k": 0.0368,
+      "mean_dx_category_jaccard_all_corpus": 0.0399,
+      "queries_where_top_k_beats_corpus_mean": 36
+    },
+    "structured_lab_dx": {
+      "queries_with_results": 37,
+      "queries_with_laboratory_similarity": 32,
+      "mean_overlapping_lab_concepts_in_results": 10.74,
+      "results_from_the_query_patient": 0,
+      "mean_dx_category_jaccard_top_k": 0.1108,
+      "mean_dx_category_jaccard_random_k": 0.0343,
+      "mean_dx_category_jaccard_all_corpus": 0.0399,
+      "queries_where_top_k_beats_corpus_mean": 35
+    }
+  },
+  "note": "Sanity check only. No relevance labels exist for this dataset; shared ICD categories are a crude proxy. structured_dx and structured_lab_dx rank BY diagnosis overlap, so their diagnosis agreement is circular and shown only for reference."
+}

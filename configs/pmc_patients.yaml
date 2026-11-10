@@ -1,0 +1,75 @@
+# PMC-Patients (patient-to-patient retrieval) — an openly licensed, published dataset used as a
+# real-data stand-in while INSPECT access is pending. It is NOT INSPECT.
+#
+#   Zhao et al., Scientific Data 10, 909 (2023). CC BY-NC-SA 4.0 (non-commercial).
+#   https://huggingface.co/datasets/zhengyun21/PMC-Patients-ReCDS
+#
+# Download PPR/corpus.jsonl, PPR/qrels_{dev,test}.tsv and queries/{dev,test}_queries.jsonl into
+# data/pmc_patients/raw/ (git-ignored), then:
+#   python -m app.cli prepare-dataset pmc-patients      # seeded subset -> data/pmc_patients/prepared
+#   python -m app.cli ingest  -c pmc_patients.yaml
+#   python -m app.cli reindex -c pmc_patients.yaml
+# Keep this dataset in its own store, e.g. INSPECT_RAG_ARTIFACT_DIR=artifacts/pmc_patients and a
+# matching INSPECT_RAG_DATABASE_URL.
+#
+# What it can and cannot test: free-text case similarity with published relevance labels — yes.
+# Laboratory values, diagnosis codes, images, dates — no (the data has none).
+extends: synthetic.yaml
+
+dataset:
+  name: pmc_patients
+  adapter: prepared
+  release: "PMC-Patients-ReCDS PPR; subset written by prepare-dataset (see DATASET.json)"
+  root: data/pmc_patients/prepared
+  text_label: Patient summary
+  batch_size: 2000
+
+image:
+  provider: disabled
+
+index:
+  cases_index: pmc_cases_v1
+  report_index_prefix: pmc_report_chunks_v1
+  image_index: pmc_image_features_v1
+  alias_prefix: pmc_patients
+
+index_embeddings: [minilm]
+index_chunkings: [whole_impression]
+default_recipe: bm25
+
+recipes:
+  dense_minilm:
+    recipe_id: dense_minilm
+    description: Dense kNN with all-MiniLM-L6-v2 over whole summaries (first 256 tokens).
+    branches: [dense]
+    embedding: minilm
+  hybrid_rrf_minilm:
+    recipe_id: hybrid_rrf_minilm
+    description: BM25 + MiniLM fused at document level with RRF (k=60).
+    branches: [bm25, dense]
+    embedding: minilm
+    fusion: {method: rrf, rrf_k: 60, weights: {bm25: 1.0, dense: 1.0}}
+
+generation:
+  key: extractive
+  backend: extractive
+  model: extractive-evidence-v1
+  max_cases: 3
+  max_evidence_per_case: 2
+  context_token_budget: 3000
+  max_item_tokens: 600
+
+evaluation:
+  query_set: data/pmc_patients/prepared/eval/queries.jsonl
+  qrels: data/pmc_patients/prepared/eval/qrels.jsonl
+  generation_set: data/pmc_patients/prepared/eval/generation_eval.jsonl
+  k_values: [5, 10, 20]
+  relevance_threshold: 1          # PPR labels are binary (1 = similar patient)
+  unjudged_policy: non_relevant
+  label_sources: [pmc_patients_ppr]
+  label_note: >-
+    Labels are the published PMC-Patients patient-to-patient similarity annotations, which the
+    dataset authors derived from the PubMed citation graph (binary in this split). They are not
+    clinician judgments, and unlabelled pairs are counted as not relevant, so true similar patients
+    without a citation link lower the scores.
+  top_k: 20

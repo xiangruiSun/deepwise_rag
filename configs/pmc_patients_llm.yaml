@@ -1,0 +1,15 @@
+# PMC-Patients with a small local open-source LLM (Llama 3.2 1B through Ollama) as generator.
+extends: pmc_patients.yaml
+
+generation:
+  key: llama32_1b
+  backend: ollama
+  model: "llama3.2:1b"
+  prompt_variant: structured_citations
+  post_verification: true
+  timeout_seconds: 300
+  max_cases: 3
+  max_evidence_per_case: 2
+  context_token_budget: 3000
+  max_item_tokens: 600
+  max_output_tokens: 500

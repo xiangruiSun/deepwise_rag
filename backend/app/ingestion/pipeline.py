@@ -218,9 +218,10 @@ class IngestionPipeline:
             first = patients.setdefault(row.patient_id, row)
             for attr in ("gender", "race", "ethnicity"):
                 if getattr(first, attr) and getattr(row, attr) and getattr(first, attr) != getattr(row, attr):
-                    self.report.warnings.append(
-                        f"patient demographic '{attr}' differs between cohort rows; first value kept"
-                    )
+                    self._count(f"demographic_conflicts_{attr}")  # counted; one warning per attribute
+                    message = f"patient demographic '{attr}' differs between cohort rows; first value kept"
+                    if message not in self.report.warnings:
+                        self.report.warnings.append(message)
             cases[case_id] = {
                 "patient_id": row.patient_id,
                 "procedure_time": procedure_time,

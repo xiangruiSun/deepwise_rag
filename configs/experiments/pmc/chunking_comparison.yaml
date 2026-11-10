@@ -1,0 +1,18 @@
+# PMC-Patients, stage 2 — chunking. Unlike INSPECT impressions these summaries are long
+# (median about 450 words), so chunking decides how much of each summary the encoder sees.
+# The embedding is fixed to MiniLM (256-token input). The query is the whole query summary.
+suite_id: chunking_comparison
+description: PMC-Patients — chunking strategies with MiniLM and a fixed dense retriever.
+base_config: pmc_patients.yaml
+stage: validation
+baseline_experiment: C01
+recipes:
+  chunk_whole: {recipe_id: chunk_whole, branches: [dense], embedding: minilm, chunking: whole_impression}
+  chunk_fixed_128: {recipe_id: chunk_fixed_128, branches: [dense], embedding: minilm, chunking: fixed_128}
+  chunk_fixed_256: {recipe_id: chunk_fixed_256, branches: [dense], embedding: minilm, chunking: fixed_256}
+  chunk_fixed_256_o32: {recipe_id: chunk_fixed_256_o32, branches: [dense], embedding: minilm, chunking: fixed_256_o32}
+runs:
+  - {experiment_id: C01, recipe: chunk_whole, description: "Whole summary (encoder sees the first 256 tokens)"}
+  - {experiment_id: C02, recipe: chunk_fixed_128, description: "Fixed 128 tokens, zero overlap"}
+  - {experiment_id: C03, recipe: chunk_fixed_256, description: "Fixed 256 tokens, zero overlap"}
+  - {experiment_id: C04, recipe: chunk_fixed_256_o32, description: "Fixed 256 tokens, 32-token overlap"}

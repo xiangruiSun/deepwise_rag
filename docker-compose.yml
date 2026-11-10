@@ -1,6 +1,6 @@
 # Local, reproducible deployment. Research prototype — not for clinical use.
 #   docker compose up -d                      # postgres, elasticsearch, backend, frontend
-#   docker compose --profile llm up -d        # + local Ollama server
+#   docker compose --profile llm up -d        # + local Ollama server (then: make pull-llm)
 #   docker compose --profile tracking up -d   # + MLflow tracking server
 # Ports are bound to 127.0.0.1 only. Elasticsearch security is disabled for LOCAL development;
 # enable TLS and authentication before exposing it to any network.
@@ -50,6 +50,8 @@ services:
       INSPECT_RAG_DEV_API_KEY: ${INSPECT_RAG_DEV_API_KEY:-dev-research-key}
       INSPECT_RAG_CORS_ORIGINS: http://localhost:8080
       INSPECT_RAG_MLFLOW_TRACKING_URI: ${INSPECT_RAG_MLFLOW_TRACKING_URI:-}
+      INSPECT_RAG_OLLAMA_BASE_URL: ${INSPECT_RAG_OLLAMA_BASE_URL:-http://ollama:11434}
+      INSPECT_RAG_REQUEST_TIMEOUT_SECONDS: ${INSPECT_RAG_REQUEST_TIMEOUT_SECONDS:-60}
     volumes:
       - ./configs:/srv/configs:ro
       - ./data:/srv/data            # synthetic fixtures are generated here; mount INSPECT read-only yourself

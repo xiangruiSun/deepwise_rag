@@ -116,6 +116,7 @@ export interface RecipeInfo {
 export interface Meta {
   dataset: string;
   data_kind: string;
+  text_label?: string;
   genders: string[];
   laboratory_concepts: { key: string; display_name: string; unit: string }[];
   diagnosis_codes: string[];

@@ -7,12 +7,14 @@ from app.core.errors import DatasetSchemaError
 from app.ingestion.adapters.base import DatasetAdapter, LayoutReport
 from app.ingestion.adapters.inspect_legacy import InspectLegacyAdapter
 from app.ingestion.adapters.inspect_meds import InspectMedsAdapter
+from app.ingestion.adapters.prepared import PreparedDatasetAdapter
 from app.ingestion.adapters.synthetic import SyntheticAdapter
 
 ADAPTERS: dict[str, type[DatasetAdapter]] = {
     "synthetic": SyntheticAdapter,
     "inspect_legacy": InspectLegacyAdapter,
     "inspect_meds": InspectMedsAdapter,
+    "prepared": PreparedDatasetAdapter,
 }
 
 
@@ -29,6 +31,7 @@ __all__ = [
     "InspectLegacyAdapter",
     "InspectMedsAdapter",
     "LayoutReport",
+    "PreparedDatasetAdapter",
     "SyntheticAdapter",
     "build_adapter",
 ]

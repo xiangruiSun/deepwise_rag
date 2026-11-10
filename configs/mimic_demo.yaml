@@ -1,0 +1,74 @@
+# MIMIC-IV Clinical Database Demo (100 patients, MEDS format) — openly licensed structured EHR
+# data used to exercise laboratory similarity and diagnosis-code handling on real records.
+# It is NOT INSPECT: no clinical notes, no images, no relevance labels.
+#
+#   https://physionet.org/content/mimic-iv-demo-meds/0.0.1/  (ODbL 1.0)
+#
+# Extract the download into data/mimic_iv_demo_meds/ (git-ignored), then:
+#   python -m app.cli prepare-dataset mimic-demo        # -> data/mimic_iv_demo/prepared
+#   python -m app.cli ingest  -c mimic_demo.yaml
+#   python -m app.cli reindex -c mimic_demo.yaml --embedding lexical --no-images
+# One case = one hospital stay, indexed at discharge (see app/ingestion/converters/mimic_demo.py).
+extends: synthetic.yaml
+
+dataset:
+  name: mimic_iv_demo
+  adapter: prepared
+  release: "MIMIC-IV demo MEDS 0.0.1"
+  root: data/mimic_iv_demo/prepared
+  text_label: Clinical note
+  batch_size: 20000
+  lookback_days: [7, 30, 90]
+  default_lookback_days: 7
+
+image:
+  provider: disabled
+
+index:
+  cases_index: mimic_cases_v1
+  report_index_prefix: mimic_report_chunks_v1
+  image_index: mimic_image_features_v1
+  alias_prefix: mimic_demo
+
+index_embeddings: []
+index_chunkings: [whole_impression]
+default_recipe: structured_lab_dx
+
+recipes:
+  structured_lab:
+    recipe_id: structured_lab
+    description: Laboratory and vital-sign similarity only (last value within 7 days before discharge).
+    branches: []
+    multimodal:
+      enabled: true
+      modalities: [laboratory]
+      candidate_sources: [laboratory]
+      family: rank
+      weights: {laboratory: 1.0}
+      laboratory: {lookback_days: 7, aggregate: last, min_overlap: 5}
+  structured_dx:
+    recipe_id: structured_dx
+    description: Diagnosis-code overlap only.
+    branches: []
+    multimodal:
+      enabled: true
+      modalities: [diagnosis]
+      candidate_sources: [diagnosis]
+      family: rank
+      weights: {diagnosis: 1.0}
+  structured_lab_dx:
+    recipe_id: structured_lab_dx
+    description: Laboratory similarity fused with diagnosis-code overlap (weighted RRF).
+    branches: []
+    multimodal:
+      enabled: true
+      modalities: [laboratory, diagnosis]
+      candidate_sources: [laboratory, diagnosis]
+      family: rank
+      weights: {laboratory: 0.6, diagnosis: 0.4}
+      laboratory: {lookback_days: 7, aggregate: last, min_overlap: 5}
+
+evaluation:
+  query_set: null
+  qrels: null
+  generation_set: null

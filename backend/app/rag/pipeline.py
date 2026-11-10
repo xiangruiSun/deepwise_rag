@@ -62,13 +62,15 @@ class RagPipeline:
         retrieval: RetrievalService,
         config: AppConfig,
         generation_variants: dict[str, GenerationConfig] | None = None,
-        llm_client: LLMClient | None = None,
+        llm_clients: dict[str, LLMClient] | None = None,
     ) -> None:
         self.session_factory = session_factory
         self.retrieval = retrieval
         self.config = config
         self.variants = {config.generation.key: config.generation, **(generation_variants or {})}
-        self._llm_client = llm_client
+        # Pre-built clients by generation key.  A variant without one builds its own client from
+        # its own configuration, so two variants never share a model by accident.
+        self._llm_clients = dict(llm_clients or {})
         self._generators: dict[str, Generator] = {}
 
     def generator(self, key: str | None) -> Generator:
@@ -77,7 +79,7 @@ class RagPipeline:
             raise NotFoundError(f"unknown generation configuration '{key}'",
                                 {"available": sorted(self.variants)})
         if key not in self._generators:
-            self._generators[key] = build_generator(self.variants[key], self._llm_client)
+            self._generators[key] = build_generator(self.variants[key], self._llm_clients.get(key))
         return self._generators[key]
 
     # ------------------------------------------------------------------ answer
@@ -199,7 +201,7 @@ class RagPipeline:
             "query_text": request.search.query_text if request.search else None,
             "query_case_id": query_case_id,
         }
-        return EvidenceBuilder(gen_cfg).build(
+        return EvidenceBuilder(gen_cfg, self.config.dataset.text_label).build(
             request.question, query_meta, contexts.get(query_case_id) if query_case_id else None,
             [contexts[c] for c in wanted], policy, retrieval_meta, matched,
         )

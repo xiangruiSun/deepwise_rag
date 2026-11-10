@@ -25,6 +25,7 @@ QUERY_CATEGORIES = {
     "D": "Multimodal case retrieval",
     "E": "Difficult retrieval cases",
     "F": "Insufficient-evidence queries",
+    "G": "Whole-case similarity (case to case)",
 }
 
 

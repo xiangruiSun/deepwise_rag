@@ -100,10 +100,24 @@ Model-specific notes:
 
 Retrieval is frozen per run. Metrics (`app/evaluation/generation_metrics.py`): answer relevance,
 faithfulness (claim support against cited evidence), citation correctness, citation coverage,
-completeness, abstention correctness, contradiction rate, numeric accuracy, latency and tokens.
+citation relevance, completeness, abstention correctness, contradiction rate, numeric accuracy,
+parse failures, latency and tokens.
 Citation-id verification is deterministic. Claim support is heuristic (numbers, negation polarity,
 lexical grounding) and optionally a local-LLM judge; both must be calibrated on human-reviewed samples
 and are not a safety guarantee.
+
+Three behaviours were added after running real small models (Llama 3.2 1B, Qwen 2.5 1.5B):
+
+* **Citation relevance** — the share of valid citations whose record shares a content word or number
+  with its claim. Small models attach real but unrelated source ids; citation correctness alone does
+  not see that. A correct "case X does not mention it" reference also scores as unrelated, so the
+  extractive baseline is slightly below 1.
+* **Placeholder claims** (`"..."`, echoed from a format template) are dropped by the parser, and a claim
+  with no checkable content is never counted as supported.
+* **Inline citations** (`[S1]`, `<S2>…</S2>`) are parsed as citations, and an answer cut off by the
+  output-token limit is repaired by discarding its incomplete last statement (flagged in the answer).
+
+The prompt text is versioned (`PROMPT_VERSION`); the version is part of each run's configuration hash.
 
 ## Selection policy (`app/evaluation/statistics.py`)
 

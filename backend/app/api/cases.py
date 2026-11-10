@@ -232,7 +232,8 @@ def _meta(ctx: AppContext, policy: AccessPolicy) -> MetaResponse:
     labs = [{"key": c.key, "display_name": c.display_name, "unit": c.canonical_unit}
             for c in registry.concepts() if lab_codes.intersection(c.codes)]
     return MetaResponse(
-        dataset=ctx.config.dataset.name, data_kind=ctx.data_kind, genders=genders, laboratory_concepts=labs,
+        dataset=ctx.config.dataset.name, data_kind=ctx.data_kind,
+        text_label=ctx.config.dataset.text_label, genders=genders, laboratory_concepts=labs,
         diagnosis_codes=codes, study_modalities=modalities,
         age_range=[float(ages[0]), float(ages[1])] if ages[0] is not None and ages[1] is not None else None,
         recipes=[{"recipe_id": r.recipe_id, "description": r.description,

@@ -15,8 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from app.core.config import load_app_config  # noqa: E402
-from app.embeddings.base import resolve_commit_hash  # noqa: E402
+from app.core.config import load_app_config
+from app.embeddings.base import resolve_commit_hash
 
 
 def main() -> None:

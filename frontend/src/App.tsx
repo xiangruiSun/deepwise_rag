@@ -58,6 +58,11 @@ export default function App() {
               SYNTHETIC DATA
             </span>
           )}
+          {meta && meta.data_kind !== "synthetic" && meta.data_kind !== "inspect" && (
+            <span className="chip" title="Openly licensed dataset, not INSPECT" data-testid="dataset-chip">
+              {meta.dataset}
+            </span>
+          )}
           <nav aria-label="Main">
             <NavLink to="/" end>
               Search
@@ -99,8 +104,14 @@ export default function App() {
         {meta && (
           <Routes>
             <Route path="/" element={<SearchPage meta={meta} selected={selected} onToggle={toggle} />} />
-            <Route path="/cases/:caseId" element={<CasePage selected={selected} onToggle={toggle} />} />
-            <Route path="/compare" element={<ComparePage selected={selected} onToggle={toggle} />} />
+            <Route
+              path="/cases/:caseId"
+              element={<CasePage selected={selected} onToggle={toggle} textLabel={meta.text_label} />}
+            />
+            <Route
+              path="/compare"
+              element={<ComparePage selected={selected} onToggle={toggle} textLabel={meta.text_label} />}
+            />
             <Route path="/evaluation" element={<EvaluationPage />} />
             <Route path="*" element={<p className="empty">Page not found.</p>} />
           </Routes>

@@ -45,10 +45,13 @@ export default function ResultCard({
   result,
   selected,
   onToggle,
+  textLabel,
 }: {
   result: CaseResult;
   selected: boolean;
   onToggle: (caseId: string) => void;
+  /** What the dataset calls its per-case text record (e.g. "Patient summary"). */
+  textLabel?: string;
 }) {
   const demographics = [
     result.age !== null ? `${result.age} y` : null,
@@ -97,7 +100,10 @@ export default function ResultCard({
           <div className="small muted">
             Source:{" "}
             <Link to={`/cases/${result.case_id}#source-${evidence.source_id}`}>
-              {evidence.source_type.replace("_", " ")} {evidence.source_id}
+              {evidence.source_type === "radiology_report" && textLabel && textLabel !== "Radiology impression"
+                ? textLabel.toLowerCase()
+                : evidence.source_type.replace("_", " ")}{" "}
+              {evidence.source_id}
             </Link>
             {Object.entries(evidence.branch_ranks).map(([branch, rank]) => (
               <span key={branch}>

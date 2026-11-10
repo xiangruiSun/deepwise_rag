@@ -1,6 +1,9 @@
 # Stage 5 — generation comparison (spec section 27). Retrieval is FROZEN (one recipe).
-# G01 needs no model. G02-G06 need a local Ollama server (`docker compose --profile llm up`);
+# G01 needs no model. G02-G06 need a local Ollama server with both models pulled
+# (`docker compose --profile llm up -d`, then `ollama pull llama3.2:1b` and `ollama pull qwen2.5:1.5b`);
 # without it they are reported as failed (dependency_unavailable) and no numbers are produced.
+# The models are the smallest widely used open-weight chat models (about 1 GB each, CPU-capable).
+# The server address comes from INSPECT_RAG_OLLAMA_BASE_URL (default http://localhost:11434).
 suite_id: generation_comparison
 description: Prompting strategies and generation models with frozen retrieval.
 base_config: synthetic.yaml
@@ -10,15 +13,15 @@ generation_variants:
   extractive:
     {key: extractive, backend: extractive, model: extractive-evidence-v1, post_verification: true}
   llm_basic:
-    {key: llm_basic, backend: ollama, model: "llama3.1:8b", base_url: "http://localhost:11434", prompt_variant: basic, post_verification: false, require_citations: false}
+    {key: llm_basic, backend: ollama, model: "llama3.2:1b", timeout_seconds: 300, prompt_variant: basic, post_verification: false, require_citations: false}
   llm_structured:
-    {key: llm_structured, backend: ollama, model: "llama3.1:8b", base_url: "http://localhost:11434", prompt_variant: structured, post_verification: false, require_citations: false}
+    {key: llm_structured, backend: ollama, model: "llama3.2:1b", timeout_seconds: 300, prompt_variant: structured, post_verification: false, require_citations: false}
   llm_structured_citations:
-    {key: llm_structured_citations, backend: ollama, model: "llama3.1:8b", base_url: "http://localhost:11434", prompt_variant: structured_citations, post_verification: false}
+    {key: llm_structured_citations, backend: ollama, model: "llama3.2:1b", timeout_seconds: 300, prompt_variant: structured_citations, post_verification: false}
   llm_structured_verified:
-    {key: llm_structured_verified, backend: ollama, model: "llama3.1:8b", base_url: "http://localhost:11434", prompt_variant: structured_citations, post_verification: true}
+    {key: llm_structured_verified, backend: ollama, model: "llama3.2:1b", timeout_seconds: 300, prompt_variant: structured_citations, post_verification: true}
   llm_second_model:
-    {key: llm_second_model, backend: ollama, model: "qwen2.5:7b", base_url: "http://localhost:11434", prompt_variant: structured_citations, post_verification: true}
+    {key: llm_second_model, backend: ollama, model: "qwen2.5:1.5b", timeout_seconds: 300, prompt_variant: structured_citations, post_verification: true}
 runs:
   - {experiment_id: G01, recipe: hybrid_rrf_hashing, generation: extractive, description: Extractive evidence composer (no LLM)}
   - {experiment_id: G02, recipe: hybrid_rrf_hashing, generation: llm_basic, description: Basic grounded prompt}

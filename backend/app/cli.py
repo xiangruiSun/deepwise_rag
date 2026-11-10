@@ -72,6 +72,33 @@ def generate_synthetic(
     _echo(generate_synthetic_dataset(output, n_patients=patients, seed=seed))
 
 
+@app.command("prepare-dataset")
+@_guard
+def prepare_dataset(
+    name: Annotated[str, typer.Argument(help="pmc-patients or mimic-demo")],
+    source: Annotated[Optional[Path], typer.Option(help="Folder holding the downloaded files.")] = None,
+    output: Annotated[Optional[Path], typer.Option(help="Target folder for the prepared dataset.")] = None,
+    dev_queries: Annotated[int, typer.Option(help="PMC-Patients: sampled dev query patients (0 = all).")] = 200,
+    test_queries: Annotated[int, typer.Option(help="PMC-Patients: sampled test query patients (0 = all).")] = 200,
+    corpus_size: Annotated[int, typer.Option(help="PMC-Patients: corpus patients kept (0 = all 155k).")] = 20000,
+    seed: int = 13,
+) -> None:
+    """Convert an already downloaded open dataset to the canonical layout (nothing is downloaded)."""
+    data = REPO_ROOT / "data"
+    if name == "pmc-patients":
+        from app.ingestion.converters.pmc_patients import prepare_pmc_patients
+
+        _echo(prepare_pmc_patients(
+            source or data / "pmc_patients" / "raw", output or data / "pmc_patients" / "prepared",
+            dev_queries or None, test_queries or None, corpus_size or None, seed=seed))
+    elif name == "mimic-demo":
+        from app.ingestion.converters.mimic_demo import prepare_mimic_demo
+
+        _echo(prepare_mimic_demo(source or data / "mimic_iv_demo_meds", output or data / "mimic_iv_demo" / "prepared"))
+    else:
+        raise typer.BadParameter("name must be 'pmc-patients' or 'mimic-demo'")
+
+
 @app.command("inspect-dataset")
 @_guard
 def inspect_dataset(
@@ -309,8 +336,13 @@ def aggregate_metrics(
                 index_stats[manifest.index_name] = dict(manifest.stats or {})
     except Exception as exc:  # the report is still useful without them
         typer.secho(f"warning: index statistics unavailable ({type(exc).__name__})", err=True)
+    marker = Path(cfg.dataset.root)
+    marker = (marker if marker.is_absolute() else REPO_ROOT / marker) / "DATASET.json"
+    dataset_info = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else None
     _echo(builder.build(output or exp_dir / "report", cfg.evaluation.qrels, cfg.evaluation.label_sources,
-                        cfg.evaluation.bootstrap_samples, cfg.evaluation.seed, index_stats))
+                        cfg.evaluation.bootstrap_samples, cfg.evaluation.seed, index_stats,
+                        label_note=cfg.evaluation.label_note, dataset_info=dataset_info,
+                        text_label=cfg.dataset.text_label))
 
 
 @app.command("build-annotation-pool")

@@ -13,6 +13,24 @@ with it are for research, not clinical care.
 medical data.** Obtain the data yourself under its data-use agreement and place it under
 `data/inspect/` (git-ignored).
 
+## Getting the data
+
+What the public pages state (checked 2026-11-10; nothing here was verified against a download):
+
+* Access is for non-commercial research under a data use agreement and needs a sign-in.
+* The release is split across two hosts: CT images through the Stanford AIMI shared-datasets portal,
+  EHR data through Stanford Redivis. The project site describes the EHR as nine OMOP tables
+  (Person, Measurement, Condition Occurrence, Drug Exposure, Procedure Occurrence, Visit Occurrence,
+  Visit Detail, Device Exposure, Death).
+* The public loader README names `cohort_0.2.0_master_file_anon.csv` with `PatientID` and `StudyTime`
+  columns plus split and label columns.
+* Download sizes are not published on those pages. The image part (about 20,000 to 23,000 CT
+  studies) is large; text retrieval needs only the cohort table, the impressions and the EHR tables.
+
+**Raw OMOP tables are not read by the current adapters** (`inspect_legacy` expects FEMR-style event
+CSVs, `inspect_meds` expects MEDS Parquet). If your download is OMOP, either convert it to MEDS with
+the standard OMOP-to-MEDS ETL or add an OMOP adapter once the real column layout is in front of you.
+
 ## What is and is not verified
 
 | Item | Status |

@@ -10,7 +10,7 @@ from app.core.config import GenerationConfig
 from app.core.container import AppContext
 from app.core.errors import AuthorizationError
 from app.core.security import AccessPolicy
-from app.rag.citations import CitationVerifier, assess_claim_support
+from app.rag.citations import CitationVerifier, assess_claim_support, citation_grounding
 from app.rag.evidence import EvidenceBuilder, EvidenceItem, neutralize
 from app.rag.generators import (
     ExtractiveGenerator,
@@ -179,7 +179,7 @@ def test_llm_generator_cannot_introduce_unknown_sources(ctx: AppContext, policy:
     fake = FakeLLM(reply)
     variants = {"llm": GenerationConfig(key="llm", backend="ollama", model="fake", prompt_variant="structured_citations",
                                         post_verification=True)}
-    rag = RagPipeline(ctx.session_factory, ctx.retrieval, ctx.config, variants, llm_client=fake)
+    rag = RagPipeline(ctx.session_factory, ctx.retrieval, ctx.config, variants, llm_clients={"llm": fake})
     answer = rag.answer(request, policy, search_response=response)
     texts = [c.text for c in answer.claims()]
     assert len(texts) == 1 and texts[0].startswith("The impression documents")
@@ -192,9 +192,66 @@ def test_llm_generator_cannot_introduce_unknown_sources(ctx: AppContext, policy:
     assert f"[{report_item.source_id}]" in user and "<<<" in user
 
     # an unparseable model reply becomes an explicit insufficient-evidence answer, never free text
-    broken = RagPipeline(ctx.session_factory, ctx.retrieval, ctx.config, variants, llm_client=FakeLLM("I think..."))
+    broken = RagPipeline(ctx.session_factory, ctx.retrieval, ctx.config, variants,
+                         llm_clients={"llm": FakeLLM("I think...")})
     failed = broken.answer(request, policy, search_response=response)
     assert failed.status == "insufficient_evidence" and failed.generation_metadata["parse_error"]
+
+
+def test_placeholder_claims_are_never_shown_or_counted_as_supported(
+        ctx: AppContext, policy: AccessPolicy, case_query: dict[str, Any]) -> None:
+    """A small model may echo the format description ("...") instead of writing claims."""
+    request = _request(case_query, generation_key="llm")
+    response = ctx.retrieval.search(request.search, policy)
+    reply = ('{"status": "answered", "summary": [{"text": "...", "citations": ["S1"]}], '
+             '"similarities": [{"text": "…", "citations": ["S1", "S2"]}], "differences": "none", '
+             '"missing_evidence": ["..."], "limitations": ["..."]}')
+    variants = {"llm": GenerationConfig(key="llm", backend="ollama", model="fake", post_verification=False)}
+    rag = RagPipeline(ctx.session_factory, ctx.retrieval, ctx.config, variants, llm_clients={"llm": FakeLLM(reply)})
+    answer = rag.answer(request, policy, search_response=response)
+    assert answer.status == "insufficient_evidence" and not answer.claims()
+    assert "..." not in answer.missing_evidence and "..." not in answer.limitations
+    report = EvidenceItem("S1", "report", "imp_1", "case_a", "query", "Radiology impression: No pulmonary embolism.")
+    empty = assess_claim_support(Claim(text="Both cases document this.", citations=["S1"]), [report])
+    assert not empty["supported"] and empty["reason"] == "claim has no checkable content"
+
+
+def test_inline_citations_are_parsed_and_malformed_ids_dropped() -> None:
+    from app.rag.generators import _claims
+
+    claims = _claims([
+        {"text": "<S2>Lobar embolism in the left lower lobe.</S2>", "citations": []},
+        {"text": "Small effusion [S1, S4].", "citations": ["[S1]", "source 9", "S4"]},
+        "D-dimer was 3200 ng/mL [S7]",
+        {"text": "CASES1 is not a source id.", "citations": "S3"},
+    ])
+    assert [(c.text, c.citations) for c in claims] == [
+        ("Lobar embolism in the left lower lobe.", ["S2"]),
+        ("Small effusion .", ["S1", "S4"]),
+        ("D-dimer was 3200 ng/mL", ["S7"]),
+        ("CASES1 is not a source id.", ["S3"]),
+    ]
+
+
+def test_truncated_model_reply_is_repaired_only_when_allowed() -> None:
+    from app.rag.generators import parse_llm_json
+
+    cut = '{"status": "answered", "summary": ["First [S1], done.", "Second {x} [S2]"], "similarities": ["Third [S1'
+    assert parse_llm_json(cut) is None
+    repaired = parse_llm_json(cut, allow_truncated=True)
+    assert repaired == {"status": "answered", "summary": ["First [S1], done.", "Second {x} [S2]"], "_truncated": True}
+    assert parse_llm_json("no json at all", allow_truncated=True) is None
+    assert parse_llm_json('{"status": "answered"}', allow_truncated=True) == {"status": "answered"}
+
+
+def test_citation_grounding_flags_padded_references() -> None:
+    report = EvidenceItem("S1", "report", "imp_1", "case_a", "query",
+                          "Radiology impression: No pulmonary embolism. Small right pleural effusion.")
+    lab = EvidenceItem("S2", "laboratory", "ev_1", "case_a", "query", "Hemoglobin: 14.5 g/dL",
+                       {"concept_key": "hemoglobin", "original_value": 14.5})
+    claim = Claim(text="A small right pleural effusion is documented.", citations=["S1", "S2"])
+    assert citation_grounding(claim, [report, lab]) == [True, False]
+    assert citation_grounding(Claim(text="Hemoglobin was 14.5 g/dL.", citations=["S2"]), [lab]) == [True]
 
 
 def test_prompt_injection_in_retrieved_text_is_neutralised() -> None:

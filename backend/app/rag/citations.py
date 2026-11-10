@@ -162,6 +162,29 @@ def _numbers(text: str) -> set[float]:
     return {round(float(n), 6) for n in _NUMBER.findall(_IDENTIFIER.sub(" ", text))}
 
 
+def citation_grounding(claim: Claim, cited: list[EvidenceItem]) -> list[bool]:
+    """Per citation: does the cited record share any content word or number with the claim?
+
+    A reference can be real and authorized and still have nothing to do with the statement it
+    is attached to (small models pad claims with extra source ids).  This is a coarse
+    diagnostic: a correct "case X does not mention it" reference also shares nothing."""
+    words = {_stem(w) for w in _WORD.findall(_IDENTIFIER.sub(" ", claim.text).lower()) if w not in _STOP}
+    numbers = _numbers(claim.text)
+    grounded: list[bool] = []
+    for item in cited:
+        item_words = {_stem(w) for w in _WORD.findall(item.text.lower())}
+        concept = item.data.get("concept_key")
+        if concept:
+            item_words.update(_stem(w) for w in _WORD.findall(str(concept).lower()))
+        item_numbers = _numbers(item.text)
+        for key in ("original_value", "canonical_value"):
+            value = item.data.get(key)
+            if isinstance(value, (int, float)):
+                item_numbers.add(round(float(f"{value:g}"), 6))
+        grounded.append(bool(words & item_words) or bool(numbers & item_numbers))
+    return grounded
+
+
 def assess_claim_support(claim: Claim, cited: list[EvidenceItem]) -> dict[str, Any]:
     """Heuristic support check of one claim against its cited evidence.
 
@@ -189,6 +212,10 @@ def assess_claim_support(claim: Claim, cited: list[EvidenceItem]) -> dict[str, A
         concept = item.data.get("concept_key")
         if concept:
             evidence_words.update(_stem(w) for w in _WORD.findall(str(concept).lower()))
+    if not words and not claim_numbers:
+        # nothing that could be checked against a record: never count it as supported
+        return {"supported": False, "reason": "claim has no checkable content", "numeric_ok": True,
+                "lexical_overlap": 0.0, "polarity_ok": True}
     overlap = len(words & evidence_words) / len(words) if words else 1.0
     polarity_ok = True
     claim_negated = bool(_NEG.search(claim.text))

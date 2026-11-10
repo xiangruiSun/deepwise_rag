@@ -161,6 +161,7 @@ class MetaResponse(BaseModel):
 
     dataset: str
     data_kind: str
+    text_label: str = "Radiology impression"
     genders: list[str]
     laboratory_concepts: list[dict[str, str]]
     diagnosis_codes: list[str]

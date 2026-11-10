@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     log_clinical_text: bool = False
     otel_enabled: bool = False
     mlflow_tracking_uri: str | None = None
+    # Local Ollama server used by ``generation.backend: ollama`` when the config has no base_url.
+    ollama_base_url: str = "http://localhost:11434"
     cors_origins: str = "http://localhost:5173"
 
     @property
@@ -89,9 +91,11 @@ class StrictModel(BaseModel):
 
 class DatasetConfig(StrictModel):
     name: str
-    adapter: Literal["synthetic", "inspect_legacy", "inspect_meds"]
+    adapter: Literal["synthetic", "inspect_legacy", "inspect_meds", "prepared"]
     release: str | None = None
     root: str
+    # What the per-case text record is called in evidence and in the UI.
+    text_label: str = "Radiology impression"
     # adapter specific: explicit file locations and column mappings (never guessed)
     files: dict[str, str] = Field(default_factory=dict)
     columns: dict[str, dict[str, str]] = Field(default_factory=dict)
@@ -291,7 +295,13 @@ class GenerationConfig(StrictModel):
     max_cases: int = Field(default=5, ge=1, le=20)
     max_evidence_per_case: int = Field(default=8, ge=1, le=50)
     context_token_budget: int = Field(default=3000, ge=200)
+    # Longest single evidence record shown to the generator; longer text is cut and marked.
+    # None keeps whole records (right for short impressions; set it for long case summaries).
+    max_item_tokens: int | None = Field(default=None, ge=50)
     max_output_tokens: int = Field(default=800, ge=16)
+    # Model context window requested from the server (Ollama ``num_ctx``).  It must hold the
+    # instructions, the evidence budget and the answer; Ollama otherwise truncates silently.
+    context_window: int = Field(default=8192, ge=1024)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     timeout_seconds: float = 120.0
     require_citations: bool = True
@@ -299,6 +309,13 @@ class GenerationConfig(StrictModel):
 
     @model_validator(mode="after")
     def _external_gate(self) -> GenerationConfig:
+        if self.backend != "extractive" and (
+            self.context_window < self.context_token_budget + self.max_output_tokens + 512
+        ):
+            raise ValueError(
+                "generation.context_window must be at least context_token_budget + "
+                "max_output_tokens + 512 (room for the instructions)"
+            )
         if self.backend == "external":
             ext = self.external_api
             if not (ext.enabled and ext.i_confirm_data_is_authorized_for_this_provider):
@@ -319,6 +336,8 @@ class EvaluationConfig(StrictModel):
     relevance_threshold: int = Field(default=2, ge=1, le=3)
     unjudged_policy: Literal["non_relevant", "condensed"] = "non_relevant"
     label_sources: list[str] = Field(default_factory=lambda: ["clinician"])
+    # Where the relevance labels come from and what they mean; printed in every report.
+    label_note: str | None = None
     seed: int = 13
     bootstrap_samples: int = Field(default=2000, ge=100)
     warmup_queries: int = Field(default=2, ge=0)

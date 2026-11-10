@@ -7,3 +7,6 @@ Nothing in this directory is committed except this file.
 * `data/inspect/` — place authorized Stanford INSPECT files here yourself (see `docs/dataset.md`).
   The repository never downloads INSPECT and `.gitignore` excludes everything under `data/`.
 * `data/inspect_eval/` — query sets and clinician-reviewed relevance labels for INSPECT evaluations.
+* `data/pmc_patients/`, `data/mimic_iv_demo_meds/`, `data/mimic_iv_demo/` — two small open datasets
+  you download yourself and convert with `prepare-dataset` (see `docs/open_datasets.md`). Their
+  licences (CC BY-NC-SA 4.0 and ODbL 1.0) apply; they are not committed either.

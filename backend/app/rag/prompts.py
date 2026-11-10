@@ -22,15 +22,27 @@ _CITATION_RULES = """Citation rules:
 - Cite only ids that appear in the evidence. Never create new ids.
 - A claim that cannot be cited must be omitted or moved to "missing_evidence"."""
 
-_SCHEMA = """Return a single JSON object with exactly these keys:
-{
-  "status": "answered" | "insufficient_evidence",
-  "summary": [{"text": "...", "citations": ["S1"]}],
-  "similarities": [{"text": "...", "citations": ["S1", "S4"]}],
-  "differences": [{"text": "...", "citations": ["S1", "S4"]}],
-  "missing_evidence": ["..."],
-  "limitations": ["..."]
-}
+# Bump when any prompt text changes: the version is part of every run's configuration hash, so
+# results produced with different prompts are never mixed or resumed into each other.
+PROMPT_VERSION = "2"
+
+# The format is described in words on purpose.  A literal template with "..." placeholders is
+# echoed verbatim by small models (observed with a 1B model), producing empty claims.
+_SCHEMA = """Return a single JSON object with exactly these six keys:
+- "status": "answered" or "insufficient_evidence"
+- "summary": a list of claims, one or more per case
+- "similarities": a list of claims about what the cases have in common
+- "differences": a list of claims about how the cases differ
+- "missing_evidence": a list of strings naming information the evidence does not contain
+- "limitations": a list of strings
+A claim is an object with two keys: "text", one complete sentence that states a documented fact
+in words taken from the evidence, and "citations", the list of source ids (such as "S1") of the
+evidence lines that state it.
+For example, a claim supported by the evidence lines [S1] and [S4] has "citations": ["S1", "S4"].
+Put source ids in "citations" only, not inside "text".
+Write real sentences. Never output placeholders such as "..." and never repeat these instructions.
+A similarity or a difference compares cases, so it cites sources from at least two different cases.
+Be concise: at most four claims per list, and never repeat a claim.
 Use "insufficient_evidence" (with empty claim lists) when the evidence cannot answer the question."""
 
 _BASIC = """Answer the question using only the evidence below. If the evidence is insufficient,

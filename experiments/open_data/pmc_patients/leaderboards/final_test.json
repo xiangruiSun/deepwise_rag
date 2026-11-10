@@ -1,0 +1,26 @@
+[
+  {
+    "experiment_id": "R01",
+    "run_id": "R01-7fd6549a0ee3",
+    "evaluation_status": "completed",
+    "stage": "test",
+    "data_kind": "pmc_patients",
+    "embedding_model": null,
+    "retrieval_method": "bm25",
+    "fusion_strategy": null,
+    "reranker": null,
+    "chunking": "whole_impression",
+    "modality_combination": "text",
+    "recall@10": 0.42388888888888887,
+    "precision@10": 0.0955,
+    "ndcg@10": 0.34568625368782513,
+    "judged_coverage@10": 0.0955,
+    "p50_latency_ms": 82.013,
+    "p95_retrieval_latency_ms": 133.43004999999997,
+    "faithfulness": null,
+    "citation_coverage": null,
+    "index_size_bytes": 65477639,
+    "gates_passed": true,
+    "error": null
+  }
+]

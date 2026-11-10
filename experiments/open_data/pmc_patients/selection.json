@@ -1,0 +1,131 @@
+{
+  "policy": {
+    "primary_metric": "ndcg@10",
+    "selection_data": "validation",
+    "safety_gates": [
+      "authorization_isolation",
+      "split_isolation",
+      "temporal_cutoff",
+      "citation_validity",
+      "reproducible_execution"
+    ],
+    "max_latency_ratio": 5.0,
+    "min_faithfulness": null,
+    "bootstrap_samples": 2000,
+    "seed": 13
+  },
+  "baseline": "R01",
+  "selected": "R01",
+  "rationale": "no configuration showed a credible improvement; simpler baseline kept",
+  "decisions": [
+    {
+      "experiment_id": "R01",
+      "primary_metric": 0.34363848812424225,
+      "status": "baseline"
+    },
+    {
+      "experiment_id": "R02",
+      "primary_metric": 0.268804833885747,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 200,
+        "mean_baseline": 0.34363848812424225,
+        "mean_candidate": 0.268804833885747,
+        "mean_difference": -0.07483365423849521,
+        "ci_low": -0.12140953956379968,
+        "ci_high": -0.031304043466907565,
+        "p_not_better": 1.0,
+        "wins": 40,
+        "losses": 78,
+        "ties": 82,
+        "top_decile_share": 0.7798728182642223
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R03",
+      "primary_metric": 0.3463466945507387,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 200,
+        "mean_baseline": 0.34363848812424225,
+        "mean_candidate": 0.3463466945507387,
+        "mean_difference": 0.0027082064264964756,
+        "ci_low": -0.02215589393996547,
+        "ci_high": 0.026773807208800845,
+        "p_not_better": 0.4235,
+        "wins": 39,
+        "losses": 60,
+        "ties": 101,
+        "top_decile_share": 0.8251873495724618
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R04",
+      "primary_metric": 0.3427443494900665,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 200,
+        "mean_baseline": 0.34363848812424225,
+        "mean_candidate": 0.3427443494900665,
+        "mean_difference": -0.0008941386341757429,
+        "ci_low": -0.027947101932385535,
+        "ci_high": 0.025734685279824886,
+        "p_not_better": 0.5315,
+        "wins": 39,
+        "losses": 57,
+        "ties": 104,
+        "top_decile_share": 0.843014398989173
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R05",
+      "primary_metric": 0.22205144260918744,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 200,
+        "mean_baseline": 0.34363848812424225,
+        "mean_candidate": 0.22205144260918744,
+        "mean_difference": -0.12158704551505474,
+        "ci_low": -0.1641886965987995,
+        "ci_high": -0.08050840243212232,
+        "p_not_better": 1.0,
+        "wins": 33,
+        "losses": 83,
+        "ties": 84,
+        "top_decile_share": 0.8799681301116812
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    },
+    {
+      "experiment_id": "R06",
+      "primary_metric": 0.30899560986458946,
+      "comparison": {
+        "metric": "ndcg@10",
+        "n_queries": 200,
+        "mean_baseline": 0.34363848812424225,
+        "mean_candidate": 0.30899560986458946,
+        "mean_difference": -0.03464287825965275,
+        "ci_low": -0.07418251755233965,
+        "ci_high": 0.0037191378707426112,
+        "p_not_better": 0.9605,
+        "wins": 44,
+        "losses": 62,
+        "ties": 94,
+        "top_decile_share": 0.7508961806862352
+      },
+      "status": "not_selected",
+      "reason": "no credible improvement over the baseline (95% CI includes 0)"
+    }
+  ],
+  "suite_id": "retrieval_comparison",
+  "data_kind": "pmc_patients",
+  "dataset_fingerprint": "4a4c237e06adf06e6441e0a27e67c858b57b794e0e778ed6bd3a86c24d229f43",
+  "selected_recipe": "bm25"
+}

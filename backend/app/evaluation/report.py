@@ -93,8 +93,11 @@ class ReportBuilder:
     # ------------------------------------------------------------------ build
     def build(self, output_dir: Path, qrels_path: str | None = None, label_sources: list[str] | None = None,
               bootstrap_samples: int = 2000, seed: int = 13,
-              index_stats: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
-        """``index_stats``: build statistics per index name (from ``index_manifests``)."""
+              index_stats: dict[str, dict[str, Any]] | None = None, label_note: str | None = None,
+              dataset_info: dict[str, Any] | None = None,
+              text_label: str = "Radiology impression") -> dict[str, Any]:
+        """``index_stats``: build statistics per index name (from ``index_manifests``).
+        ``dataset_info``: the ``DATASET.json`` provenance marker of a prepared open dataset."""
         self.index_stats = index_stats or {}
         output_dir = Path(output_dir)
         charts_dir = output_dir / "charts"
@@ -116,6 +119,12 @@ class ReportBuilder:
             md += ["> **SYNTHETIC DATA.** Every number below was measured on fabricated fixtures and "
                    "verifies that the pipeline works. It is **not** evidence of clinical retrieval "
                    "performance and no INSPECT experiment is reported here.", ""]
+        elif dataset_info:
+            md += [f"> **Dataset: {dataset_info.get('source', data_kind)}** "
+                   f"(licence: {dataset_info.get('license', 'see source')}). {dataset_info.get('notice', '')} "
+                   "**No INSPECT experiment is reported here.**", ""]
+            if dataset_info.get("citation"):
+                md += [f"> Source: {dataset_info['citation']} <{dataset_info.get('source_url', '')}>", ""]
         md += ["> Research prototype. Not for diagnosis, treatment decisions or clinical use.", ""]
 
         # 1 ------------------------------------------------------------------
@@ -129,7 +138,7 @@ class ReportBuilder:
                 ["Patients", counts.get("patients")], ["Cases", counts.get("cases")],
                 ["Cases train / valid / test", f"{counts.get('cases_split_train')} / "
                  f"{counts.get('cases_split_valid')} / {counts.get('cases_split_test')}"],
-                ["Radiology impressions", counts.get("reports")], ["Clinical events", counts.get("events")],
+                [f"{text_label} records", counts.get("reports")], ["Clinical events", counts.get("events")],
                 ["Imaging studies", counts.get("imaging_studies")],
                 ["Modalities", ", ".join(manifest.get("available_modalities", []))],
             ]))
@@ -173,6 +182,8 @@ class ReportBuilder:
                 md.append("")
                 md.append("Synthetic labels come from a hand-specified rubric over latent attributes of the "
                           "generator — they are NOT clinician judgments.")
+            elif label_note:
+                md += ["", label_note]
             else:
                 md.append("")
                 md.append("Authoritative labels must come from qualified clinical reviewers using the blinded "
@@ -315,6 +326,16 @@ class ReportBuilder:
         if data_kind == "synthetic":
             limits.insert(0, "All results in this report are from synthetic fixtures; no INSPECT experiment has "
                              "been run. The INSPECT adapters are not yet validated against the real release.")
+        elif dataset_info:
+            # an open stand-in dataset: the INSPECT-specific caveats above do not describe it
+            limits = [
+                f"All results in this report are from {dataset_info.get('source', data_kind)}, not INSPECT; "
+                "they do not transfer to INSPECT, whose adapters are still not validated against the real "
+                "release.",
+                "This system is a research prototype and is not validated for clinical care.",
+                *([label_note] if label_note else []),
+                "Automated generation metrics are heuristics that require calibration against human review.",
+            ]
         md += [f"- {item}" for item in limits]
 
         (output_dir / "report.md").write_text("\n".join(md) + "\n", encoding="utf-8")
@@ -359,8 +380,8 @@ class ReportBuilder:
                                 r["summary"]["index_size_bytes"],
                                 (ix.get("encoder_truncation") or {}).get("documents_truncated") if m else None,
                                 self._truncated_queries(r) if m else None] for r in runs]),
-                   "", "The local backend performs exact kNN; approximate-kNN latency and recall must be "
-                       "measured on the Elasticsearch backend."]
+                   "", "kNN is exact on the local backend and approximate (HNSW) on Elasticsearch; compare "
+                       "latency and recall only between runs on the same backend."]
         elif key == "chunking":
             self._chart(report, md, charts_dir, "ndcg_by_chunking.svg",
                         bar_chart("nDCG@10 by chunking strategy",
@@ -372,8 +393,8 @@ class ReportBuilder:
                                 ix.get("embedding_seconds"), r["summary"]["index_size_bytes"],
                                 r["summary"]["metrics"].get("recall@10"), r["summary"]["metrics"].get("ndcg@10"),
                                 r["summary"]["p95_latency_ms"]] for r in runs]),
-                   "", "Short impressions are never split, so strategies whose limits exceed the impression "
-                       "length produce identical chunk sets and therefore identical results."]
+                   "", "Texts shorter than the chunk limit are never split, so strategies whose limits exceed "
+                       "the text length produce identical chunk sets and therefore identical results."]
         elif key == "reranking":
             points = [(r["experiment_id"], float(r["summary"]["rerank_depth"] or 0),
                        float(r["summary"]["latency_ms"].get("reranking", {}).get("p95") or 0.0)) for r in runs]
@@ -397,13 +418,15 @@ class ReportBuilder:
         elif key == "generation":
             gen = [(r["experiment_id"], r["summary"].get("generation") or {}) for r in runs]
             md += [_table(["Experiment", "Backend / model", "Prompt", "Verified", "Relevance", "Faithfulness",
-                           "Citation correctness", "Citation coverage", "Completeness", "Abstention",
-                           "Contradiction", "Numeric accuracy", "Latency ms", "Output tokens"],
+                           "Citation correctness", "Citation coverage", "Citation relevance", "Completeness",
+                           "Abstention", "Contradiction", "Numeric accuracy", "Parse failures",
+                           "Latency ms", "Output tokens"],
                           [[eid, f"{g.get('backend')} / {g.get('model')}", g.get("prompt_variant"),
                             g.get("post_verification"), g.get("answer_relevance"), g.get("faithfulness"),
-                            g.get("citation_correctness"), g.get("citation_coverage"), g.get("completeness"),
-                            g.get("abstention_correctness"), g.get("contradiction_rate"),
-                            g.get("numeric_accuracy"), g.get("generation_latency_ms"), g.get("output_tokens")]
+                            g.get("citation_correctness"), g.get("citation_coverage"), g.get("citation_relevance"),
+                            g.get("completeness"), g.get("abstention_correctness"),
+                            g.get("contradiction_rate"), g.get("numeric_accuracy"), g.get("parse_failure"),
+                            g.get("generation_latency_ms"), g.get("output_tokens")]
                            for eid, g in gen])]
             points = [(eid, float(g["output_tokens"]), float(g["faithfulness"])) for eid, g in gen
                       if g.get("output_tokens") is not None and g.get("faithfulness") is not None]
