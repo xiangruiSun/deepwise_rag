@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import cases, routes
+from app.api import cases, routes, v1
 from app.core.config import get_settings
 from app.core.container import AppContext, build_context
 from app.core.errors import AppError
@@ -82,6 +82,9 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
 
     app.include_router(routes.router, prefix="/api/v1")
     app.include_router(cases.router, prefix="/api/v1")
+    # document-corpus platform: tenant-aware RAG over versioned hybrid indexes
+    app.include_router(v1.router, prefix="/v1")
+    app.include_router(v1.health_router)
     setup_tracing(app, settings.otel_enabled)
     return app
 

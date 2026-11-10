@@ -1,0 +1,43 @@
+# Document-corpus platform with real models: MiniLM embeddings and a cross-encoder reranker.
+# Needs backend/requirements-ml.txt and the model weights. Same strategies as corpus.yaml.
+name: corpus
+index_prefix: corpus_neural_chunks
+mapping_version: m1
+
+embedding:
+  key: minilm
+  provider: sentence_transformers
+  model_id: sentence-transformers/all-MiniLM-L6-v2
+  revision: null
+  dimension: 384
+  pooling: mean
+  normalize: true
+  max_document_tokens: 256
+  max_query_tokens: 256
+  batch_size: 64
+
+chunking: {strategy: sliding_window, max_tokens: 200, overlap: 30}
+
+retrieval: {strategy: hybrid, rerank: false, final_k: 8, query_routing: true, query_rewriting: true}
+
+strategies:
+  bm25: {strategy: bm25}
+  dense: {strategy: dense}
+  hybrid: {strategy: hybrid}
+  hybrid_rerank: {strategy: hybrid, rerank: true, rerank_depth: 20}
+  hybrid_rerank_routed: {strategy: hybrid, rerank: true, rerank_depth: 20, query_routing: true, query_rewriting: true}
+  adaptive: {strategy: hybrid, rerank: true, rerank_depth: 20, query_routing: true, query_rewriting: true, adaptive_depth: true}
+  no_freshness: {strategy: hybrid, freshness: false}
+
+reranker:
+  enabled: true
+  key: ms_marco_minilm
+  provider: cross_encoder
+  model_id: cross-encoder/ms-marco-MiniLM-L6-v2
+  depth: 20
+  batch_size: 32
+
+context: {selection: diverse, token_budget: 1500, max_chunks: 8}
+generation: {backend: extractive, model: extractive-v1}
+cache: {backend: memory}
+acronyms_file: corpus_acronyms.yaml

@@ -31,6 +31,8 @@ class Principal:
     user_id: str
     role: Role
     scopes: frozenset[str] = field(default_factory=frozenset)
+    # Tenant of the credential.  Never taken from a request body, query string or header.
+    tenant_id: str = "default"
 
     def has_role(self, minimum: Role) -> bool:
         return _ROLE_RANK[self.role] >= _ROLE_RANK[minimum]
@@ -68,13 +70,15 @@ def authenticate(api_key: str | None, settings: Settings) -> Principal:
                 user_id=str(spec.get("user", "unknown")),
                 role=Role(spec.get("role", "researcher")),
                 scopes=frozenset(spec.get("scopes", [])),
+                tenant_id=str(spec.get("tenant", "default")),
             )
     if (
         settings.environment != "production"
         and settings.dev_api_key
         and hmac.compare_digest(settings.dev_api_key, api_key)
     ):
-        return Principal(user_id="dev", role=Role.ADMIN, scopes=frozenset({"research"}))
+        return Principal(user_id="dev", role=Role.ADMIN, scopes=frozenset({"research"}),
+                         tenant_id=settings.dev_tenant)
     raise AuthenticationError("invalid API key")
 
 

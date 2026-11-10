@@ -116,6 +116,14 @@ class ElasticsearchBackend:
         ok, _errors = helpers.bulk(self.client, actions, raise_on_error=False, refresh=False)
         return int(ok)
 
+    def delete_by_filter(self, name: str, filters: FilterSpec) -> int:
+        """Delete every document matching ``filters`` (an empty filter is refused)."""
+        if not (filters.terms or filters.all_terms or filters.ranges or filters.exists):
+            raise ValueError("delete_by_filter requires at least one positive condition")
+        response = self.client.delete_by_query(index=name, query=build_filter_clauses(filters),
+                                               conflicts="proceed", refresh=True)
+        return int(response.get("deleted", 0))
+
     def refresh(self, name: str) -> None:
         self.client.indices.refresh(index=name)
 

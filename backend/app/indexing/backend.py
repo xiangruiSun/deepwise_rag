@@ -127,6 +127,7 @@ class SearchBackend(Protocol):
     def list_indexes(self) -> list[str]: ...
     def bulk_index(self, name: str, docs: list[dict[str, Any]]) -> None: ...
     def delete_documents(self, name: str, ids: list[str]) -> int: ...
+    def delete_by_filter(self, name: str, filters: FilterSpec) -> int: ...
     def refresh(self, name: str) -> None: ...
     def get_document(self, name: str, doc_id: str) -> dict[str, Any] | None: ...
     def count(self, name: str, filters: FilterSpec | None = None) -> int: ...
@@ -384,6 +385,20 @@ class LocalSearchBackend:
                 index.vectors.pop(doc_id, None)
             index._dirty = True
             return removed
+
+    def delete_by_filter(self, name: str, filters: FilterSpec) -> int:
+        """Delete every document matching ``filters`` (an empty filter is refused)."""
+        if not (filters.terms or filters.all_terms or filters.ranges or filters.exists):
+            raise ValueError("delete_by_filter requires at least one positive condition")
+        with self._lock:
+            index = self._resolve(name)
+            doomed = [doc_id for doc_id, source in index.docs.items() if filters.matches(source)]
+            for doc_id in doomed:
+                del index.docs[doc_id]
+                index.vectors.pop(doc_id, None)
+            if doomed:
+                index._dirty = True
+            return len(doomed)
 
     def refresh(self, name: str) -> None:
         with self._lock:

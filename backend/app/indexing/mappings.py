@@ -28,12 +28,60 @@ _DYNAMIC_TEMPLATES = [
 ]
 
 
-def _vector_field(dimension: int, similarity: str) -> dict[str, Any]:
-    return {"type": "dense_vector", "dims": dimension, "index": True, "similarity": similarity}
+# Tenant-aware document chunks (app/corpus).  Validity bounds are epoch seconds so that the
+# backend-neutral range filter works; "no end of validity" is stored as OPEN_ENDED_TS.
+OPEN_ENDED_TS = 4_102_444_800.0  # 2100-01-01
+_CHUNK_PROPERTIES: dict[str, Any] = {
+    "tenant_id": {"type": "keyword"},
+    "document_id": {"type": "keyword"},
+    "document_version": {"type": "integer"},
+    "document_type": {"type": "keyword"},
+    "source_system": {"type": "keyword"},
+    "source_record_id": {"type": "keyword"},
+    "acl_groups": {"type": "keyword"},
+    "chunk_index": {"type": "integer"},
+    "chunk_count": {"type": "integer"},
+    "token_count": {"type": "integer"},
+    "section_path": {"type": "keyword"},
+    "title": {"type": "text"},
+    TEXT_FIELD: {"type": "text", "analyzer": "standard", "similarity": "BM25"},
+    "chunk_text": {"type": "text", "index": False},
+    "content_hash": {"type": "keyword"},
+    "write_id": {"type": "keyword"},
+    "event_ts": {"type": "double"},
+    "valid_from_ts": {"type": "double"},
+    "valid_to_ts": {"type": "double"},
+    "event_time": {"type": "keyword"},
+    "source_updated_at": {"type": "keyword"},
+    "chunking_version": {"type": "keyword"},
+    "embedding_model_version": {"type": "keyword"},
+}
+
+
+def _vector_field(dimension: int, similarity: str, quantization: str | None = None) -> dict[str, Any]:
+    field: dict[str, Any] = {"type": "dense_vector", "dims": dimension, "index": True, "similarity": similarity}
+    if quantization == "int8":  # scalar-quantised HNSW: about a quarter of the vector memory
+        field["index_options"] = {"type": "int8_hnsw"}
+    return field
 
 
 def build_mapping(spec: IndexSpec, shards: int = 1, replicas: int = 0) -> dict[str, Any]:
-    properties: dict[str, Any] = dict(_CASE_METADATA)
+    if spec.kind == "chunks":
+        properties: dict[str, Any] = dict(_CHUNK_PROPERTIES)
+        if spec.dimension is not None:
+            properties[VECTOR_FIELD] = _vector_field(spec.dimension, spec.similarity,
+                                                     spec.meta.get("vector_quantization"))
+        return {
+            "settings": {"number_of_shards": shards, "number_of_replicas": replicas},
+            "mappings": {
+                "dynamic": True,
+                "dynamic_templates": [_DYNAMIC_TEMPLATES[1]],
+                "_meta": {"kind": spec.kind, "mapping_version": spec.mapping_version,
+                          "similarity": spec.similarity, **spec.meta},
+                "properties": properties,
+            },
+        }
+    properties = dict(_CASE_METADATA)
     if spec.kind == "reports":
         properties.update(
             {

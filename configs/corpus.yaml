@@ -1,0 +1,64 @@
+# Document-corpus platform (app/corpus) — default, CPU-only configuration.
+# No model download and no GPU: hashing embeddings, a lexical-overlap reranker and the extractive
+# generator. Use corpus_neural.yaml for real embedding / cross-encoder models and
+# generation.backend=openai_compatible for a vLLM (or any OpenAI-compatible) server.
+name: corpus
+index_prefix: corpus_chunks
+mapping_version: m1
+
+embedding:
+  key: hashing
+  provider: hashing
+  model_id: hashing-ngram-v1
+  dimension: 384
+  pooling: hashing
+  max_document_tokens: 512
+  max_query_tokens: 512
+
+chunking: {strategy: sliding_window, max_tokens: 200, overlap: 30}
+
+# Default strategy of the online API. Starting values for experiments, not universal optima.
+retrieval:
+  strategy: hybrid
+  bm25_top_k: 100
+  dense_top_k: 100
+  num_candidates: 200
+  rrf_k: 60
+  fusion_window: 100
+  rerank: false
+  final_k: 8
+  query_routing: true
+  query_rewriting: true
+  freshness: true
+
+# Named strategies: selectable per request ("strategy": "bm25") and compared in ablations.
+strategies:
+  bm25: {strategy: bm25}
+  dense: {strategy: dense}
+  hybrid: {strategy: hybrid}
+  hybrid_rerank: {strategy: hybrid, rerank: true, rerank_depth: 20}
+  hybrid_rerank_routed: {strategy: hybrid, rerank: true, rerank_depth: 20, query_routing: true, query_rewriting: true}
+  adaptive: {strategy: hybrid, rerank: true, rerank_depth: 20, query_routing: true, query_rewriting: true, adaptive_depth: true}
+  no_freshness: {strategy: hybrid, freshness: false}
+
+reranker: {enabled: true, key: lexical_overlap, provider: lexical_overlap, depth: 20}
+
+context:
+  selection: diverse
+  token_budget: 1500
+  max_chunks: 8
+  duplicate_threshold: 0.85
+  mmr_lambda: 0.7
+  per_document_limit: 3
+
+generation:
+  backend: extractive
+  model: extractive-v1
+  prompt_version: corpus-p1
+  verify_citations: true
+
+cache: {backend: memory, retrieval_ttl_seconds: 120, query_embedding_ttl_seconds: 3600}
+
+vector_quantization: none
+consistency_interval_seconds: 120
+acronyms_file: corpus_acronyms.yaml

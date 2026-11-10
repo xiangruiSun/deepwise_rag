@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     api_keys_json: str | None = None
     # Only honoured when environment != production (documented in docs/deployment.md).
     dev_api_key: str | None = "dev-research-key"
+    # tenant of the development key (document corpus platform)
+    dev_tenant: str = "tenant-000"
+    # document corpus platform (app/corpus): config file in config_dir
+    corpus_config: str = "corpus.yaml"
     request_timeout_seconds: float = 60.0
     log_level: str = "INFO"
     log_clinical_text: bool = False

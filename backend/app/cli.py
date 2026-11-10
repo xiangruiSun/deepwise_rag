@@ -29,6 +29,10 @@ app = typer.Typer(add_completion=False, no_args_is_help=True,
 
 ConfigOpt = Annotated[Optional[str], typer.Option("--config", "-c", help="Application config (in configs/).")]
 
+from app.corpus.cli import corpus_app  # noqa: E402
+
+app.add_typer(corpus_app, name="corpus")
+
 
 def _echo(data: Any) -> None:
     typer.echo(json.dumps(data, indent=2, sort_keys=True, default=str))

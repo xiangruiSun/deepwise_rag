@@ -1,0 +1,26 @@
+# Abbreviation -> full form, used by query rewriting (retrieval.query_rewriting).
+# This file matches the synthetic corpus vocabulary; replace it with your organisation's glossary.
+AAA: abdominal aortic aneurysm
+AFib: atrial fibrillation
+AKI: acute kidney injury
+ARDS: acute respiratory distress syndrome
+BPH: benign prostatic hyperplasia
+CAD: coronary artery disease
+CAP: community acquired pneumonia
+CHF: congestive heart failure
+CKD: chronic kidney disease
+COPD: chronic obstructive pulmonary disease
+DKA: diabetic ketoacidosis
+DVT: deep vein thrombosis
+GERD: gastroesophageal reflux disease
+IBD: inflammatory bowel disease
+MI: myocardial infarction
+MS: multiple sclerosis
+OSA: obstructive sleep apnea
+PAD: peripheral arterial disease
+PE: pulmonary embolism
+RA: rheumatoid arthritis
+SAH: subarachnoid hemorrhage
+TIA: transient ischemic attack
+UTI: urinary tract infection
+VAP: ventilator associated pneumonia
